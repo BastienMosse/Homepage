@@ -1,0 +1,19 @@
+title: lucipher-lab
+
+background:
+  image: ""
+  blur: sm
+  opacity: 50
+
+theme: dark
+color: violet
+
+headerStyle: clean
+
+layout:
+  Projets:
+    style: row
+    columns: 4
+  Administration:
+    style: row
+    columns: 3
