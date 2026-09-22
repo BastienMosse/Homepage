@@ -55,7 +55,7 @@
       {
         "name": "WireGuard",
         "desc": "Gestion du VPN",
-        "url": "http://10.8.0.1:51821",
+        "url": "https://heimdall.lucipher-lab.fr",
         "icon": "shield-check",
         "color": "cyan"
       }
