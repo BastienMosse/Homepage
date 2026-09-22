@@ -55,7 +55,7 @@
       {
         "name": "WireGuard",
         "desc": "Gestion du VPN",
-        "url": "https://wg.lucipher-lab.fr",
+        "url": "http://10.8.0.1:51821",
         "icon": "shield-check",
         "color": "cyan"
       }
