@@ -1,4 +1,5 @@
 title: lucipher-lab
+language: fr
 
 background:
   image: ""
@@ -6,14 +7,12 @@ background:
   opacity: 50
 
 theme: dark
-color: violet
+color: slate
 
 headerStyle: clean
+cardBlur: md
 
 layout:
   Projets:
     style: row
     columns: 4
-  Administration:
-    style: row
-    columns: 3

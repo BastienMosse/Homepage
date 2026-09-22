@@ -18,19 +18,3 @@
         icon: mdi-shield-lock
         href: https://relais.lucipher-lab.fr
         description: Messagerie chiffrée de bout en bout
-
-- Administration:
-    - Odin:
-        icon: mdi-server
-        href: https://odin.lucipher-lab.fr
-        description: Gestion des services (Coolify)
-
-    - WireGuard:
-        icon: mdi-vpn
-        href: https://wg.lucipher-lab.fr
-        description: Gestion du VPN
-
-    - Relais Dashboard:
-        icon: mdi-monitor-dashboard
-        href: https://relais.lucipher-lab.fr/dashboard
-        description: Monitoring du relais

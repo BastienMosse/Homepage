@@ -1,0 +1,20 @@
+:root {
+    --color-50: 248 250 252;
+    --color-100: 241 245 249;
+    --color-200: 226 232 240;
+    --color-300: 203 213 225;
+    --color-400: 148 163 184;
+    --color-500: 100 116 139;
+    --color-600: 71 85 105;
+    --color-700: 51 65 85;
+    --color-800: 15 23 42;
+    --color-900: 6 6 10;
+}
+
+body {
+    background: #06060a !important;
+}
+
+#page_container {
+    background: #06060a !important;
+}
