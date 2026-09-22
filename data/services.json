@@ -34,9 +34,9 @@
           "color": "emerald"
         },
         {
-          "name": "Prometheus",
+          "name": "Yggdrasil",
           "desc": "Stockage & partage de fichiers",
-          "url": "https://prometheus.lucipher-lab.fr",
+          "url": "https://yggdrasil.lucipher-lab.fr",
           "icon": "hard-drive",
           "color": "amber"
         }
