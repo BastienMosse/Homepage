@@ -61,12 +61,13 @@
       }
     ],
     "monitoredContainers": [
-      "menestrel",
-      "relais",
-      "whisper",
-      "prometheus",
-      "network-learning",
-      "homepage"
+      "liq0xouv0cqkqso06qfis2rh",
+      "usgbk1bbkulfol9niy8qonco",
+      "4qdtghjn1rtenu2vxqygnqd4",
+      "xu4pjawjk6lktnryrvrny6k9",
+      "6lkpphdbklre2pacrvokdvfr",
+      "v1qxmzg5gtz6qyc0ipsgoxxi",
+      "wg-easy"
     ]
   }
 }

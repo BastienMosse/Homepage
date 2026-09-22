@@ -93,7 +93,7 @@ async function getContainers(filter) {
             })
             .map(c => ({
                 id: c.Id.slice(0, 12),
-                name: (c.Names?.[0] || '').replace(/^\//, ''),
+                name: c.Labels?.['coolify.name'] || (c.Names?.[0] || '').replace(/^\//, ''),
                 state: c.State,
                 status: c.Status,
                 image: c.Image,
