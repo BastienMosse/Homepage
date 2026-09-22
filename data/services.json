@@ -1,0 +1,72 @@
+{
+  "sections": [
+    {
+      "id": "sites",
+      "label": "Sites",
+      "icon": "globe",
+      "items": [
+        {
+          "name": "Network Learning",
+          "desc": "Cours réseau interactifs",
+          "url": "https://network-learning.lucipher-lab.fr",
+          "icon": "graduation-cap",
+          "color": "purple"
+        },
+        {
+          "name": "Relais",
+          "desc": "Messagerie chiffrée E2E",
+          "url": "https://relais.lucipher-lab.fr",
+          "icon": "shield",
+          "color": "mint"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "label": "Outils",
+      "icon": "wrench",
+      "items": [
+        {
+          "name": "Whisper",
+          "desc": "Secrets éphémères chiffrés",
+          "url": "https://whisper.lucipher-lab.fr",
+          "icon": "message-circle",
+          "color": "emerald"
+        },
+        {
+          "name": "Prometheus",
+          "desc": "Stockage & partage de fichiers",
+          "url": "https://prometheus.lucipher-lab.fr",
+          "icon": "hard-drive",
+          "color": "amber"
+        }
+      ]
+    }
+  ],
+  "admin": {
+    "links": [
+      {
+        "name": "Odin",
+        "desc": "Gestion des services",
+        "url": "https://odin.lucipher-lab.fr",
+        "icon": "server",
+        "color": "red"
+      },
+      {
+        "name": "WireGuard",
+        "desc": "Gestion du VPN",
+        "url": "https://wg.lucipher-lab.fr",
+        "icon": "shield-check",
+        "color": "cyan"
+      }
+    ],
+    "monitoredContainers": [
+      "menestrel",
+      "relais",
+      "whisper",
+      "prometheus",
+      "network-learning",
+      "homepage"
+    ]
+  }
+}
