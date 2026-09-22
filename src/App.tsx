@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Section, ServiceItem, Container } from './types.ts';
+import type { Section, Container } from './types.ts';
 import SectionBlock from './components/SectionBlock.tsx';
-import ServiceCard from './components/ServiceCard.tsx';
 import LoginModal from './components/LoginModal.tsx';
 import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut } from 'lucide-react';
 
@@ -10,7 +9,6 @@ export default function App() {
     const [authed, setAuthed] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
     const [adminOpen, setAdminOpen] = useState(false);
-    const [adminLinks, setAdminLinks] = useState<ServiceItem[]>([]);
     const [containers, setContainers] = useState<Container[]>([]);
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
@@ -20,7 +18,6 @@ export default function App() {
     }, []);
 
     const loadAdmin = useCallback(() => {
-        fetch('/api/admin/config').then(r => r.json()).then(d => setAdminLinks(d.links || []));
         fetch('/api/admin/containers').then(r => r.json()).then(d => setContainers(d.containers || []));
     }, []);
 
@@ -48,7 +45,6 @@ export default function App() {
         await fetch('/api/auth/logout', { method: 'POST' });
         setAuthed(false);
         setAdminOpen(false);
-        setAdminLinks([]);
         setContainers([]);
     }
 
@@ -101,21 +97,6 @@ export default function App() {
                                 <LogOut size={10} />
                             </button>
                         </div>
-
-                        {/* Admin links */}
-                        {adminLinks.length > 0 && (
-                            <div className="section" style={{ animationDelay: '0s' }}>
-                                <div className="section-header">
-                                    <ShieldCheck size={14} />
-                                    Administration
-                                </div>
-                                <div className="cards">
-                                    {adminLinks.map(link => (
-                                        <ServiceCard key={link.url} item={link} />
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         {/* Container monitoring */}
                         <div className="section" style={{ animationDelay: '.05s' }}>

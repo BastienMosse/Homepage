@@ -1,37 +1,23 @@
 {
   "sections": [
     {
-      "id": "sites",
-      "label": "Sites",
-      "icon": "globe",
+      "id": "infra",
+      "label": "Infrastructure",
+      "icon": "server",
       "items": [
         {
-          "name": "Network Learning",
-          "desc": "Cours réseau interactifs",
-          "url": "https://network-learning.lucipher-lab.fr",
-          "icon": "graduation-cap",
-          "color": "purple"
+          "name": "Odin",
+          "desc": "Gestion des services",
+          "url": "https://odin.lucipher-lab.fr",
+          "icon": "server",
+          "color": "red"
         },
         {
-          "name": "Relais",
-          "desc": "Messagerie chiffrée E2E",
-          "url": "https://relais.lucipher-lab.fr",
-          "icon": "shield",
-          "color": "mint"
-        }
-      ]
-    },
-    {
-      "id": "tools",
-      "label": "Outils",
-      "icon": "wrench",
-      "items": [
-        {
-          "name": "Whisper",
-          "desc": "Secrets éphémères chiffrés",
-          "url": "https://whisper.lucipher-lab.fr",
-          "icon": "message-circle",
-          "color": "emerald"
+          "name": "Heimdall",
+          "desc": "Gestion du VPN",
+          "url": "https://heimdall.lucipher-lab.fr",
+          "icon": "shield-check",
+          "color": "cyan"
         },
         {
           "name": "Yggdrasil",
@@ -41,25 +27,37 @@
           "color": "amber"
         }
       ]
+    },
+    {
+      "id": "sites",
+      "label": "Sites & Outils",
+      "icon": "globe",
+      "items": [
+        {
+          "name": "Relais",
+          "desc": "Messagerie chiffrée E2E",
+          "url": "https://relais.lucipher-lab.fr",
+          "icon": "shield",
+          "color": "mint"
+        },
+        {
+          "name": "Whisper",
+          "desc": "Secrets éphémères chiffrés",
+          "url": "https://whisper.lucipher-lab.fr",
+          "icon": "message-circle",
+          "color": "emerald"
+        },
+        {
+          "name": "Network Learning",
+          "desc": "Cours réseau interactifs",
+          "url": "https://network-learning.lucipher-lab.fr",
+          "icon": "graduation-cap",
+          "color": "purple"
+        }
+      ]
     }
   ],
   "admin": {
-    "links": [
-      {
-        "name": "Odin",
-        "desc": "Gestion des services",
-        "url": "https://odin.lucipher-lab.fr",
-        "icon": "server",
-        "color": "red"
-      },
-      {
-        "name": "WireGuard",
-        "desc": "Gestion du VPN",
-        "url": "https://heimdall.lucipher-lab.fr",
-        "icon": "shield-check",
-        "color": "cyan"
-      }
-    ],
     "monitoredContainers": [
       "liq0xouv0cqkqso06qfis2rh",
       "usgbk1bbkulfol9niy8qonco",
