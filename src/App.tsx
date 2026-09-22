@@ -74,20 +74,18 @@ export default function App() {
                 <header className="hero">
                     <div className="logo">lucipher-lab</div>
                     <div className="tagline">Infrastructure & Services</div>
+                    <button className="admin-toggle" onClick={handleAdminToggle}>
+                        {authed ? <ShieldCheck size={13} /> : <Lock size={13} />}
+                        {authed
+                            ? (adminOpen ? 'Masquer le panneau' : 'Panneau admin')
+                            : 'Connexion admin'
+                        }
+                    </button>
                 </header>
 
                 {sections.map((s, i) => (
                     <SectionBlock key={s.id} section={s} delay={0.15 + i * 0.1} />
                 ))}
-
-                {/* Admin toggle */}
-                <button className="admin-toggle" onClick={handleAdminToggle}>
-                    {authed ? <ShieldCheck size={13} /> : <Lock size={13} />}
-                    {authed
-                        ? (adminOpen ? 'Masquer le panneau' : 'Panneau admin')
-                        : 'Connexion admin'
-                    }
-                </button>
 
                 {/* Admin panel */}
                 {authed && adminOpen && (
