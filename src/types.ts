@@ -4,6 +4,7 @@ export interface ServiceItem {
     url: string;
     icon: string;
     color: string;
+    state?: string;
 }
 
 export interface Section {
@@ -11,6 +12,7 @@ export interface Section {
     label: string;
     icon: string;
     items: ServiceItem[];
+    adminOnly?: boolean;
 }
 
 export interface Container {
@@ -18,5 +20,12 @@ export interface Container {
     name: string;
     state: string;
     status: string;
-    image: string;
+}
+
+export interface ServerStats {
+    cpu: number;
+    memory: { total: number; used: number; percent: number };
+    disk: { total: number; used: number; percent: number };
+    uptime: number;
+    load: { load1: number; load5: number; load15: number };
 }

@@ -22,7 +22,6 @@ body {
     overflow-x: hidden;
 }
 
-/* --- Noise overlay --- */
 body::before {
     content: '';
     position: fixed;
@@ -170,6 +169,16 @@ body::before {
 .card-nolink { cursor: default }
 .card-nolink:hover { transform: none }
 
+.card-state-dot {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+}
+.card-state-dot.running { background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,0.5) }
+.card-state-dot.stopped { background: #e2685f; box-shadow: 0 0 6px rgba(226,104,95,0.4) }
+
 .card-icon {
     width: 42px; height: 42px;
     border-radius: 10px;
@@ -312,6 +321,60 @@ body::before {
 }
 .admin-badge svg { width: 10px; height: 10px }
 
+/* --- Server stats --- */
+.stats-panel {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+.stat-gauge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+}
+.stat-gauge-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.stat-label {
+    font-size: .7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-dim);
+    flex: 1;
+}
+.stat-value {
+    font-size: .78rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+}
+.stat-bar-track {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.stat-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .6s var(--ease), background .4s ease;
+}
+.stat-detail {
+    font-size: .62rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+}
+.stat-uptime {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
 /* --- Container monitor --- */
 .monitor-grid {
     display: grid;
@@ -382,8 +445,10 @@ body::before {
 @media (max-width: 768px) {
     .cards { grid-template-columns: repeat(2, 1fr) }
     .monitor-grid { grid-template-columns: 1fr }
+    .stats-panel { grid-template-columns: repeat(2, 1fr) }
 }
 @media (max-width: 480px) {
     .cards { grid-template-columns: 1fr }
+    .stats-panel { grid-template-columns: 1fr }
     .logo { font-size: 1.8rem }
 }

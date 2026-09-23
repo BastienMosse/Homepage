@@ -8,9 +8,15 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
+const PROC_DIR = process.env.PROC_DIR || '/host/proc';
 
 const COOKIE_NAME = 'lab_admin';
 const COOKIE_MAX_AGE = 86400 * 7;
+
+const SKIP_CONTAINERS = new Set([
+    'coolify', 'coolify-proxy', 'coolify-db', 'coolify-redis',
+    'coolify-realtime', 'coolify-sentinel', 'homepage',
+]);
 
 const MIME = {
     '.html': 'text/html; charset=utf-8',
@@ -23,6 +29,8 @@ const MIME = {
     '.woff2': 'font/woff2',
     '.woff': 'font/woff',
 };
+
+// --- Auth ---
 
 function makeSessionToken() {
     return crypto.createHmac('sha256', ADMIN_TOKEN).update('lab-session').digest('hex');
@@ -59,11 +67,16 @@ function json(res, status, data) {
     res.end(JSON.stringify(data));
 }
 
+// --- Config ---
+
 function loadConfig() {
     const file = path.join(DATA_DIR, 'services.json');
-    if (!fs.existsSync(file)) return { sections: [], admin: { links: [], monitoredContainers: [] } };
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!fs.existsSync(file)) return { apps: {}, static: [], sections: {} };
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+    catch { return { apps: {}, static: [], sections: {} }; }
 }
+
+// --- Docker ---
 
 function dockerRequest(method, endpoint) {
     return new Promise((resolve, reject) => {
@@ -82,34 +95,168 @@ function dockerRequest(method, endpoint) {
     });
 }
 
-async function getContainers(filter) {
-    try {
-        const all = await dockerRequest('GET', '/containers/json?all=true');
-        if (!Array.isArray(all)) return [];
-        return all
-            .filter(c => {
-                const name = (c.Names?.[0] || '').replace(/^\//, '').toLowerCase();
-                return filter.some(f => name.includes(f.toLowerCase()));
-            })
-            .map(c => ({
-                id: c.Id.slice(0, 12),
-                name: c.Labels?.['coolify.resourceName'] || (c.Names?.[0] || '').replace(/^\//, ''),
-                state: c.State,
-                status: c.Status,
-                image: c.Image,
-            }));
-    } catch {
-        return [];
+function extractUrl(labels) {
+    for (const [key, value] of Object.entries(labels)) {
+        if (key.startsWith('traefik.http.routers.https-') && key.endsWith('.rule')) {
+            const match = value.match(/Host\(`([^`]+)`\)/);
+            if (match) return `https://${match[1]}`;
+        }
     }
+    return '';
 }
+
+// --- Discovery ---
+
+let cachedDiscovery = null;
+let lastDiscoveryTime = 0;
+const DISCOVERY_TTL = 5000;
+
+async function discover() {
+    const now = Date.now();
+    if (cachedDiscovery && now - lastDiscoveryTime < DISCOVERY_TTL) return cachedDiscovery;
+
+    const config = loadConfig();
+    let containers;
+    try {
+        containers = await dockerRequest('GET', '/containers/json?all=true');
+        if (!Array.isArray(containers)) containers = [];
+    } catch { containers = []; }
+
+    const items = [];
+    const allContainers = [];
+
+    for (const c of containers) {
+        const labels = c.Labels || {};
+        if (labels['coolify.managed'] !== 'true') continue;
+
+        const serviceName = labels['coolify.serviceName'] || '';
+        const resourceName = labels['coolify.resourceName'] || '';
+        const dockerName = (c.Names?.[0] || '').replace(/^\//, '');
+
+        if (SKIP_CONTAINERS.has(serviceName) || SKIP_CONTAINERS.has(resourceName) || SKIP_CONTAINERS.has(dockerName)) continue;
+        if (!serviceName && !resourceName) continue;
+
+        allContainers.push({
+            id: c.Id.slice(0, 12),
+            name: serviceName || resourceName || (c.Names?.[0] || '').replace(/^\//, ''),
+            state: c.State,
+            status: c.Status,
+        });
+
+        const appConfig = config.apps?.[serviceName] || config.apps?.[resourceName];
+        if (!appConfig) continue;
+
+        items.push({
+            name: appConfig.name || serviceName,
+            desc: appConfig.desc || '',
+            url: extractUrl(labels) || appConfig.url || '',
+            icon: appConfig.icon || 'server',
+            color: appConfig.color || 'purple',
+            section: appConfig.section || 'sites',
+            state: c.State,
+            order: appConfig.order || 99,
+        });
+    }
+
+    if (config.static) {
+        for (const entry of config.static) {
+            items.push({ ...entry, state: 'static', order: entry.order || 0 });
+        }
+    }
+
+    const sectionDefs = config.sections || {};
+    const sectionMap = {};
+
+    for (const item of items) {
+        const sid = item.section;
+        if (!sectionMap[sid]) {
+            const def = sectionDefs[sid] || { label: sid, icon: 'server', order: 99 };
+            sectionMap[sid] = {
+                id: sid,
+                label: def.label,
+                icon: def.icon,
+                order: def.order,
+                adminOnly: !!def.adminOnly,
+                items: [],
+            };
+        }
+        sectionMap[sid].items.push(item);
+    }
+
+    const sections = Object.values(sectionMap)
+        .sort((a, b) => a.order - b.order)
+        .map(s => ({ ...s, items: s.items.sort((a, b) => a.order - b.order) }));
+
+    cachedDiscovery = { sections, allContainers };
+    lastDiscoveryTime = now;
+    return cachedDiscovery;
+}
+
+// --- Server stats ---
+
+let lastCpu = null;
+
+function sampleCpu() {
+    try {
+        const stat = fs.readFileSync(path.join(PROC_DIR, 'stat'), 'utf8');
+        const parts = stat.split('\n')[0].split(/\s+/).slice(1).map(Number);
+        const idle = parts[3] + (parts[4] || 0);
+        const total = parts.reduce((a, b) => a + b, 0);
+        const prev = lastCpu;
+        lastCpu = { idle, total };
+        if (!prev) return 0;
+        const dt = total - prev.total;
+        if (dt === 0) return 0;
+        return Math.round((1 - (idle - prev.idle) / dt) * 100);
+    } catch { return -1; }
+}
+
+function readMemory() {
+    try {
+        const data = fs.readFileSync(path.join(PROC_DIR, 'meminfo'), 'utf8');
+        const get = k => { const m = data.match(new RegExp(`${k}:\\s+(\\d+)`)); return m ? parseInt(m[1]) * 1024 : 0; };
+        const total = get('MemTotal');
+        const avail = get('MemAvailable');
+        const used = total - avail;
+        return { total, used, percent: total ? Math.round(used / total * 100) : 0 };
+    } catch { return { total: 0, used: 0, percent: -1 }; }
+}
+
+function readUptime() {
+    try {
+        return Math.floor(parseFloat(fs.readFileSync(path.join(PROC_DIR, 'uptime'), 'utf8').split(' ')[0]));
+    } catch { return 0; }
+}
+
+function readDisk() {
+    try {
+        const s = fs.statfsSync('/');
+        const total = s.blocks * s.bsize;
+        const free = s.bavail * s.bsize;
+        const used = total - free;
+        return { total, used, percent: total ? Math.round(used / total * 100) : 0 };
+    } catch { return { total: 0, used: 0, percent: -1 }; }
+}
+
+function readLoad() {
+    try {
+        const data = fs.readFileSync(path.join(PROC_DIR, 'loadavg'), 'utf8');
+        const parts = data.split(/\s+/);
+        return { load1: parseFloat(parts[0]), load5: parseFloat(parts[1]), load15: parseFloat(parts[2]) };
+    } catch { return { load1: 0, load5: 0, load15: 0 }; }
+}
+
+sampleCpu();
+const cpuInterval = setInterval(sampleCpu, 2000);
+
+// --- HTTP server ---
 
 const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
 
-    // --- API ---
     if (url === '/api/config') {
-        const config = loadConfig();
-        json(res, 200, { sections: config.sections });
+        const { sections } = await discover();
+        json(res, 200, { sections: sections.filter(s => !s.adminOnly) });
         return;
     }
 
@@ -147,18 +294,29 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    if (url === '/api/admin/config') {
+    if (url === '/api/admin/containers') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const config = loadConfig();
-        json(res, 200, { links: config.admin?.links || [] });
+        const { allContainers } = await discover();
+        json(res, 200, { containers: allContainers });
         return;
     }
 
-    if (url === '/api/admin/containers') {
+    if (url === '/api/admin/services') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const config = loadConfig();
-        const containers = await getContainers(config.admin?.monitoredContainers || []);
-        json(res, 200, { containers });
+        const { sections } = await discover();
+        json(res, 200, { sections: sections.filter(s => s.adminOnly) });
+        return;
+    }
+
+    if (url === '/api/admin/stats') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        json(res, 200, {
+            cpu: sampleCpu(),
+            memory: readMemory(),
+            disk: readDisk(),
+            uptime: readUptime(),
+            load: readLoad(),
+        });
         return;
     }
 
@@ -168,6 +326,7 @@ const server = http.createServer(async (req, res) => {
         const [, id, action] = containerAction;
         try {
             await dockerRequest('POST', `/containers/${id}/${action}`);
+            cachedDiscovery = null;
             json(res, 200, { ok: true });
         } catch (e) {
             json(res, 500, { error: e.message });
@@ -176,6 +335,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     // --- Static files ---
+
     let filePath = path.join(DIST_DIR, url === '/' ? 'index.html' : url);
     if (!filePath.startsWith(path.resolve(DIST_DIR))) {
         res.writeHead(403); res.end('Forbidden'); return;
@@ -201,3 +361,5 @@ server.listen(PORT, () => {
     if (ADMIN_TOKEN) console.log('Admin auth enabled');
     else console.log('Warning: ADMIN_TOKEN not set, admin disabled');
 });
+
+process.on('SIGTERM', () => { clearInterval(cpuInterval); server.close(); });

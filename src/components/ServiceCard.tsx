@@ -8,6 +8,9 @@ export default function ServiceCard({ item }: { item: ServiceItem }) {
     const content = (
         <>
             <div className="card-glow" style={{ background: `radial-gradient(circle at 30% 50%, ${c.glow}, transparent 70%)` }} />
+            {item.state && item.state !== 'static' && (
+                <span className={`card-state-dot ${item.state === 'running' ? 'running' : 'stopped'}`} />
+            )}
             <div className="card-icon" style={{ background: c.bg }}>
                 <Icon size={20} color={c.stroke} strokeWidth={1.8} />
             </div>

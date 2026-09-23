@@ -13,7 +13,7 @@ export default function SectionBlock({ section, delay }: { section: Section; del
             </div>
             <div className="cards">
                 {section.items.map(item => (
-                    <ServiceCard key={item.url} item={item} />
+                    <ServiceCard key={item.name} item={item} />
                 ))}
             </div>
         </div>

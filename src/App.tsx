@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Section, Container } from './types.ts';
+import type { Section, Container, ServerStats } from './types.ts';
 import SectionBlock from './components/SectionBlock.tsx';
+import ServerStatsPanel from './components/ServerStats.tsx';
 import LoginModal from './components/LoginModal.tsx';
-import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut } from 'lucide-react';
+import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut, Bot } from 'lucide-react';
+import ServiceCard from './components/ServiceCard.tsx';
 
 export default function App() {
     const [sections, setSections] = useState<Section[]>([]);
@@ -10,6 +12,8 @@ export default function App() {
     const [showLogin, setShowLogin] = useState(false);
     const [adminOpen, setAdminOpen] = useState(false);
     const [containers, setContainers] = useState<Container[]>([]);
+    const [adminSections, setAdminSections] = useState<Section[]>([]);
+    const [stats, setStats] = useState<ServerStats | null>(null);
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
     useEffect(() => {
@@ -19,34 +23,16 @@ export default function App() {
 
     const loadAdmin = useCallback(() => {
         fetch('/api/admin/containers').then(r => r.json()).then(d => setContainers(d.containers || []));
+        fetch('/api/admin/services').then(r => r.json()).then(d => setAdminSections(d.sections || []));
+        fetch('/api/admin/stats').then(r => r.json()).then(d => setStats(d));
     }, []);
 
     useEffect(() => {
         if (!authed) return;
         loadAdmin();
-        const iv = setInterval(loadAdmin, 10000);
+        const iv = setInterval(loadAdmin, 5000);
         return () => clearInterval(iv);
     }, [authed, loadAdmin]);
-
-    function handleLoginSuccess() {
-        setShowLogin(false);
-        setAuthed(true);
-    }
-
-    function handleAdminToggle() {
-        if (authed) {
-            setAdminOpen(v => !v);
-        } else {
-            setShowLogin(true);
-        }
-    }
-
-    async function handleLogout() {
-        await fetch('/api/auth/logout', { method: 'POST' });
-        setAuthed(false);
-        setAdminOpen(false);
-        setContainers([]);
-    }
 
     async function containerAction(id: string, action: string) {
         setLoadingAction(`${id}-${action}`);
@@ -70,7 +56,7 @@ export default function App() {
                 <header className="hero">
                     <div className="logo">lucipher-lab</div>
                     <div className="tagline">Infrastructure & Services</div>
-                    <button className="admin-toggle" onClick={handleAdminToggle}>
+                    <button className="admin-toggle" onClick={() => authed ? setAdminOpen(v => !v) : setShowLogin(true)}>
                         {authed ? <ShieldCheck size={13} /> : <Lock size={13} />}
                         {authed
                             ? (adminOpen ? 'Masquer le panneau' : 'Panneau admin')
@@ -83,14 +69,17 @@ export default function App() {
                     <SectionBlock key={s.id} section={s} delay={0.15 + i * 0.1} />
                 ))}
 
-                {/* Admin panel */}
                 {authed && adminOpen && (
                     <div className="admin-panel">
                         <div className="admin-badge">
                             <ShieldCheck size={10} />
                             Connecté en tant qu'administrateur
                             <button
-                                onClick={handleLogout}
+                                onClick={async () => {
+                                    await fetch('/api/auth/logout', { method: 'POST' });
+                                    setAuthed(false); setAdminOpen(false);
+                                    setContainers([]); setStats(null); setAdminSections([]);
+                                }}
                                 style={{ marginLeft: 8, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
                                 title="Déconnexion"
                             >
@@ -98,11 +87,35 @@ export default function App() {
                             </button>
                         </div>
 
-                        {/* Container monitoring */}
+                        {/* Server stats */}
                         <div className="section" style={{ animationDelay: '.05s' }}>
                             <div className="section-header">
                                 <Activity size={14} />
-                                Services
+                                Serveur
+                            </div>
+                            <ServerStatsPanel stats={stats} />
+                        </div>
+
+                        {/* Admin-only sections (bots/services) */}
+                        {adminSections.map(s => (
+                            <div key={s.id} className="section" style={{ animationDelay: '.1s' }}>
+                                <div className="section-header">
+                                    <Bot size={14} />
+                                    {s.label}
+                                </div>
+                                <div className="cards">
+                                    {s.items.map(item => (
+                                        <ServiceCard key={item.name} item={item} />
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Container monitoring */}
+                        <div className="section" style={{ animationDelay: '.15s' }}>
+                            <div className="section-header">
+                                <Activity size={14} />
+                                Conteneurs
                             </div>
                             {containers.length === 0 ? (
                                 <p style={{ color: 'var(--text-dim)', fontSize: '.8rem' }}>
@@ -116,28 +129,16 @@ export default function App() {
                                             <span className="container-name" title={c.status}>{c.name}</span>
                                             <div className="container-actions">
                                                 {c.state !== 'running' && (
-                                                    <button
-                                                        title="Démarrer"
-                                                        onClick={() => containerAction(c.id, 'start')}
-                                                        disabled={loadingAction === `${c.id}-start`}
-                                                    >
+                                                    <button title="Démarrer" onClick={() => containerAction(c.id, 'start')} disabled={loadingAction === `${c.id}-start`}>
                                                         <Play size={12} />
                                                     </button>
                                                 )}
                                                 {c.state === 'running' && (
-                                                    <button
-                                                        title="Stopper"
-                                                        onClick={() => containerAction(c.id, 'stop')}
-                                                        disabled={loadingAction === `${c.id}-stop`}
-                                                    >
+                                                    <button title="Stopper" onClick={() => containerAction(c.id, 'stop')} disabled={loadingAction === `${c.id}-stop`}>
                                                         <Square size={12} />
                                                     </button>
                                                 )}
-                                                <button
-                                                    title="Redémarrer"
-                                                    onClick={() => containerAction(c.id, 'restart')}
-                                                    disabled={loadingAction === `${c.id}-restart`}
-                                                >
+                                                <button title="Redémarrer" onClick={() => containerAction(c.id, 'restart')} disabled={loadingAction === `${c.id}-restart`}>
                                                     <RotateCw size={12} />
                                                 </button>
                                             </div>
@@ -155,7 +156,7 @@ export default function App() {
             </div>
 
             {showLogin && (
-                <LoginModal onSuccess={handleLoginSuccess} onClose={() => setShowLogin(false)} />
+                <LoginModal onSuccess={() => { setShowLogin(false); setAuthed(true); }} onClose={() => setShowLogin(false)} />
             )}
         </>
     );
