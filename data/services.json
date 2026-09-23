@@ -55,6 +55,20 @@
           "color": "purple"
         }
       ]
+    },
+    {
+      "id": "services",
+      "label": "Services",
+      "icon": "bot",
+      "items": [
+        {
+          "name": "Menestrel",
+          "desc": "Bot Discord",
+          "url": "",
+          "icon": "bot",
+          "color": "indigo"
+        }
+      ]
     }
   ],
   "admin": {
@@ -65,7 +79,7 @@
       "xu4pjawjk6lktnryrvrny6k9",
       "6lkpphdbklre2pacrvokdvfr",
       "v1qxmzg5gtz6qyc0ipsgoxxi",
-      "wg-easy"
+      "lpdqjrjdfiqqtmlcaxgxqost"
     ]
   }
 }
