@@ -2,13 +2,13 @@
   "apps": {
     "headplane": { "name": "Heimdall", "section": "infra", "icon": "shield-check", "color": "cyan", "desc": "Gestion du VPN", "url": "https://heimdall.lucipher-lab.fr", "order": 2 },
     "yggdrasil": { "name": "Yggdrasil", "section": "infra", "icon": "hard-drive", "color": "amber", "desc": "Stockage & partage de fichiers", "order": 3 },
-    "cyberdash": { "name": "Cyber Dashboard", "section": "sites", "icon": "shield-check", "color": "red", "desc": "Veille sécurité & menaces", "order": 0 },
+    "cyber-dashboard": { "name": "Cyber Dashboard", "section": "sites", "icon": "shield-check", "color": "red", "desc": "Veille sécurité & menaces", "order": 0 },
     "relais": { "name": "Relais", "section": "sites", "icon": "shield", "color": "mint", "desc": "Messagerie chiffrée E2E", "order": 1 },
     "whisper": { "name": "Whisper", "section": "sites", "icon": "message-circle", "color": "emerald", "desc": "Secrets éphémères chiffrés", "order": 2 },
     "network-learning": { "name": "Network Learning", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Cours réseau interactifs", "order": 3 },
     "outline": { "name": "Outline", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Wiki & documentation", "order": 4 },
     "freshrss": { "name": "FreshRSS", "section": "sites", "icon": "globe", "color": "amber", "desc": "Agrégateur de flux RSS", "order": 5 },
-    "errorpages": { "name": "Error Pages", "section": "sites", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "order": 6 },
+    "error-pages": { "name": "Error Pages", "section": "sites", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "order": 6 },
     "menestrel": { "name": "Menestrel", "section": "services", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "order": 1 }
   },
   "static": [
