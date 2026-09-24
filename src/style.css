@@ -377,9 +377,8 @@ body::before {
 
 /* --- Container monitor --- */
 .monitor-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    columns: 2;
+    column-gap: 8px;
 }
 .container-row {
     display: flex;
@@ -435,6 +434,8 @@ body::before {
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
+    break-inside: avoid;
+    margin-bottom: 8px;
 }
 .group-label {
     padding: 8px 14px;
@@ -468,7 +469,7 @@ body::before {
 /* --- Responsive --- */
 @media (max-width: 768px) {
     .cards { grid-template-columns: repeat(2, 1fr) }
-    .monitor-grid { grid-template-columns: 1fr }
+    .monitor-grid { columns: 1 }
     .stats-panel { grid-template-columns: repeat(2, 1fr) }
 }
 @media (max-width: 480px) {

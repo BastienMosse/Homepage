@@ -1,6 +1,5 @@
 {
   "apps": {
-    "homepage": { "name": "Homepage", "section": "infra", "icon": "layout-dashboard", "color": "purple", "desc": "Portail principal", "order": 0 },
     "headplane": { "name": "Heimdall", "section": "infra", "icon": "shield-check", "color": "cyan", "desc": "Gestion du VPN", "url": "https://heimdall.lucipher-lab.fr", "order": 2 },
     "yggdrasil": { "name": "Yggdrasil", "section": "infra", "icon": "hard-drive", "color": "amber", "desc": "Stockage & partage de fichiers", "order": 3 },
     "cyberdash": { "name": "Cyber Dashboard", "section": "sites", "icon": "shield-check", "color": "red", "desc": "Veille sécurité & menaces", "order": 0 },
