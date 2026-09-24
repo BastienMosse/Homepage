@@ -7,6 +7,7 @@ export interface ServiceItem {
     color: string;
     state?: string;
     hidden?: boolean;
+    bot?: boolean;
 }
 
 export interface Section {

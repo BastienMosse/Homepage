@@ -137,7 +137,7 @@ export default function App() {
                                 </div>
                                 <div className="cards">
                                     {s.items.map(item => (
-                                        <ServiceCard key={item.name} item={item} onClick={() => setPage('bots')} />
+                                        <ServiceCard key={item.name} item={item} onClick={item.bot ? () => setPage('bots') : undefined} />
                                     ))}
                                 </div>
                             </div>

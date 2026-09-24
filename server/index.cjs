@@ -224,6 +224,7 @@ async function discover() {
             state: c.State,
             order: svc.order ?? 99,
             hidden: !!svc.hidden,
+            bot: !!svc.bot,
         });
     }
 
