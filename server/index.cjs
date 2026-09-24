@@ -321,6 +321,43 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if (url === '/api/admin/bots') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const config = loadConfig();
+        const sectionDefs = config.sections || {};
+        const botSections = Object.entries(sectionDefs)
+            .filter(([, def]) => def.adminOnly)
+            .map(([id]) => id);
+
+        let containers;
+        try {
+            containers = await dockerRequest('GET', '/containers/json?all=true');
+            if (!Array.isArray(containers)) containers = [];
+        } catch { containers = []; }
+
+        const bots = [];
+        for (const c of containers) {
+            const labels = c.Labels || {};
+            if (labels['coolify.managed'] !== 'true') continue;
+            const serviceName = labels['coolify.serviceName'] || '';
+            const resourceName = labels['coolify.resourceName'] || '';
+            const appConfig = config.apps?.[serviceName] || config.apps?.[resourceName];
+            if (!appConfig || !botSections.includes(appConfig.section)) continue;
+            bots.push({
+                id: c.Id.slice(0, 12),
+                name: appConfig.name || serviceName,
+                key: serviceName || resourceName,
+                desc: appConfig.desc || '',
+                icon: appConfig.icon || 'bot',
+                color: appConfig.color || 'purple',
+                state: c.State,
+                status: c.Status,
+            });
+        }
+        json(res, 200, { bots });
+        return;
+    }
+
     if (url === '/api/admin/stats') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         json(res, 200, {

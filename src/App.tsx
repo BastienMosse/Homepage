@@ -4,7 +4,8 @@ import SectionBlock from './components/SectionBlock.tsx';
 import ServerStatsPanel from './components/ServerStats.tsx';
 import LoginModal from './components/LoginModal.tsx';
 import ContainerModal from './components/ContainerModal.tsx';
-import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut, Bot } from 'lucide-react';
+import BotMonitor from './components/BotMonitor.tsx';
+import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut, Bot, ExternalLink } from 'lucide-react';
 import ServiceCard from './components/ServiceCard.tsx';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
     const [stats, setStats] = useState<ServerStats | null>(null);
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
     const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
+    const [page, setPage] = useState<'home' | 'bots'>('home');
 
     useEffect(() => {
         fetch('/api/config').then(r => r.json()).then(d => setSections(d.sections || []));
@@ -47,6 +49,16 @@ export default function App() {
         if (state === 'running') return 'running';
         if (state === 'exited') return 'exited';
         return 'other';
+    }
+
+    if (page === 'bots' && authed) {
+        return (
+            <>
+                <div className="glow glow-1" />
+                <div className="glow glow-2" />
+                <BotMonitor onBack={() => setPage('home')} />
+            </>
+        );
     }
 
     return (
@@ -104,10 +116,13 @@ export default function App() {
                                 <div className="section-header">
                                     <Bot size={14} />
                                     {s.label}
+                                    <button className="section-link" onClick={() => setPage('bots')} title="Monitoring bots">
+                                        <ExternalLink size={12} />
+                                    </button>
                                 </div>
                                 <div className="cards">
                                     {s.items.map(item => (
-                                        <ServiceCard key={item.name} item={item} />
+                                        <ServiceCard key={item.name} item={item} onClick={() => setPage('bots')} />
                                     ))}
                                 </div>
                             </div>

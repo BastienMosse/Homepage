@@ -1,7 +1,7 @@
 import type { ServiceItem } from '../types.ts';
 import { getIcon, COLORS } from './Icons.tsx';
 
-export default function ServiceCard({ item }: { item: ServiceItem }) {
+export default function ServiceCard({ item, onClick }: { item: ServiceItem; onClick?: () => void }) {
     const Icon = getIcon(item.icon);
     const c = COLORS[item.color] || COLORS.purple;
 
@@ -20,6 +20,10 @@ export default function ServiceCard({ item }: { item: ServiceItem }) {
             </div>
         </>
     );
+
+    if (onClick) {
+        return <div className="card" style={{ cursor: 'pointer' }} onClick={onClick}>{content}</div>;
+    }
 
     if (!item.url) {
         return <div className="card card-nolink">{content}</div>;
