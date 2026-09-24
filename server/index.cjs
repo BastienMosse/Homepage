@@ -153,20 +153,17 @@ async function discover() {
         if (appConfig && !groupMap[groupKey].matched) {
             groupMap[groupKey].matched = true;
             groupMap[groupKey].label = appConfig.name || serviceName;
+            items.push({
+                name: appConfig.name || serviceName,
+                desc: appConfig.desc || '',
+                url: extractUrl(labels) || appConfig.url || '',
+                icon: appConfig.icon || 'server',
+                color: appConfig.color || 'purple',
+                section: appConfig.section || 'sites',
+                state: c.State,
+                order: appConfig.order || 99,
+            });
         }
-
-        if (!appConfig) continue;
-
-        items.push({
-            name: appConfig.name || serviceName,
-            desc: appConfig.desc || '',
-            url: extractUrl(labels) || appConfig.url || '',
-            icon: appConfig.icon || 'server',
-            color: appConfig.color || 'purple',
-            section: appConfig.section || 'sites',
-            state: c.State,
-            order: appConfig.order || 99,
-        });
     }
 
     const allContainers = Object.values(groupMap).map(g => ({
