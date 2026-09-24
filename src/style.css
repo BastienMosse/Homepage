@@ -902,6 +902,15 @@ body::before {
     border-color: var(--border-hover);
 }
 .le-card-dragging { opacity: 0.35; }
+.le-drop-line {
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    margin: -2px 0;
+    box-shadow: 0 0 8px rgba(124,108,240,0.4);
+    position: relative;
+    z-index: 2;
+}
 .le-card-hidden { opacity: 0.4; }
 .le-card-static { cursor: default; opacity: 0.6; }
 .le-card-static .le-card-grip { opacity: 0.2; cursor: default; }

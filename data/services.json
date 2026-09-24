@@ -9,7 +9,7 @@
     "outline": { "name": "Outline", "icon": "graduation-cap", "color": "purple", "desc": "Wiki & documentation", "section": "sites" },
     "freshrss": { "name": "FreshRSS", "icon": "globe", "color": "amber", "desc": "Agrégateur de flux RSS", "section": "sites" },
     "error-pages": { "name": "Error Pages", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "section": "services" },
-    "menestrel": { "name": "Menestrel", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "section": "services" }
+    "menestrel": { "name": "Menestrel", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "section": "services", "bot": true }
   },
   "static": [
     { "name": "Odin", "section": "infra", "icon": "server", "color": "red", "desc": "Gestion des services", "url": "https://odin.lucipher-lab.fr", "order": 0 }

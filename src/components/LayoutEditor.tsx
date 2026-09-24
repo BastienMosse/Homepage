@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { getIcon, COLORS, ICON_NAMES, COLOR_NAMES } from './Icons.tsx';
 import { ArrowLeft, Pencil, GripVertical, Plus, EyeOff, Save, Trash2 } from 'lucide-react';
 
 interface LayoutSection { label: string; icon: string; order: number; adminOnly?: boolean; hidden?: boolean; }
-interface LayoutService { name: string; icon: string; color: string; desc: string; url?: string; section: string; order: number; hidden?: boolean; }
+interface LayoutService { name: string; icon: string; color: string; desc: string; url?: string; section: string; order: number; hidden?: boolean; bot?: boolean; }
 interface LayoutData {
     sections: Record<string, LayoutSection>;
     services: Record<string, LayoutService>;
@@ -19,6 +19,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
     const [addingSection, setAddingSection] = useState(false);
     const [dragKey, setDragKey] = useState<string | null>(null);
     const [dropTarget, setDropTarget] = useState<string | null>(null);
+    const [insertInfo, setInsertInfo] = useState<{sectionId: string; index: number} | null>(null);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
 
@@ -73,11 +74,45 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
 
     function handleDrop(sectionId: string) {
         if (!dragKey || !layout) return;
-        const maxOrder = Math.max(0, ...Object.values(layout.services)
-            .filter(s => s.section === sectionId).map(s => s.order ?? 0));
-        updateService(dragKey, { section: sectionId, order: maxOrder + 1 });
+
+        const sourceSection = layout.services[dragKey]?.section;
+
+        const targetItems = Object.entries(layout.services)
+            .filter(([k, s]) => s.section === sectionId && k !== dragKey)
+            .sort(([, a], [, b]) => (a.order ?? 99) - (b.order ?? 99));
+
+        let insertAt = targetItems.length;
+        if (insertInfo?.sectionId === sectionId) {
+            const allItems = Object.entries(layout.services)
+                .filter(([, s]) => s.section === sectionId)
+                .sort(([, a], [, b]) => (a.order ?? 99) - (b.order ?? 99));
+            const dragIdx = allItems.findIndex(([k]) => k === dragKey);
+            insertAt = insertInfo.index;
+            if (dragIdx >= 0 && dragIdx < insertAt) insertAt--;
+            insertAt = Math.max(0, Math.min(insertAt, targetItems.length));
+        }
+
+        targetItems.splice(insertAt, 0, [dragKey, layout.services[dragKey]]);
+
+        const newServices = { ...layout.services };
+        newServices[dragKey] = { ...newServices[dragKey], section: sectionId };
+        targetItems.forEach(([k], i) => {
+            newServices[k] = { ...newServices[k], order: i };
+        });
+
+        if (sourceSection && sourceSection !== sectionId) {
+            Object.entries(newServices)
+                .filter(([, s]) => s.section === sourceSection)
+                .sort(([, a], [, b]) => (a.order ?? 99) - (b.order ?? 99))
+                .forEach(([k], i) => {
+                    newServices[k] = { ...newServices[k], order: i };
+                });
+        }
+
+        setLayout({ ...layout, services: newServices });
         setDragKey(null);
         setDropTarget(null);
+        setInsertInfo(null);
     }
 
     async function handleSave() {
@@ -126,7 +161,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                 </button>
                 <h2>Modifier le layout</h2>
                 <div className="le-actions">
-                    {saved && <span className="le-saved">Sauvegardé</span>}
+                    {saved && <span className="le-saved">Sauvegard&eacute;</span>}
                     {dirty && (
                         <>
                             <button className="btn btn-ghost btn-sm" onClick={handleCancel}>Annuler</button>
@@ -148,15 +183,25 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                     <div
                         key={id}
                         className={`le-section ${dropTarget === id ? 'le-drop-target' : ''} ${def.hidden ? 'le-section-hidden' : ''}`}
-                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTarget(id); }}
-                        onDragLeave={e => { if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(null); }}
+                        onDragOver={e => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            setDropTarget(id);
+                            setInsertInfo({ sectionId: id, index: items.length });
+                        }}
+                        onDragLeave={e => {
+                            if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+                                setDropTarget(null);
+                                setInsertInfo(null);
+                            }
+                        }}
                         onDrop={e => { e.preventDefault(); handleDrop(id); }}
                     >
                         <div className="le-section-header">
                             <SectionIcon size={14} />
                             <span>{def.label}</span>
                             {def.adminOnly && <span className="le-badge">admin</span>}
-                            {def.hidden && <span className="le-badge le-badge-dim">masqué</span>}
+                            {def.hidden && <span className="le-badge le-badge-dim">masqu&eacute;</span>}
                             <button className="le-icon-btn" onClick={() => setEditSection(id)} title="Modifier la section">
                                 <Pencil size={11} />
                             </button>
@@ -179,38 +224,52 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                     </div>
                                 );
                             })}
-                            {items.map(([key, svc]) => {
+                            {items.map(([key, svc], idx) => {
                                 const SIcon = getIcon(svc.icon);
                                 const c = COLORS[svc.color] || COLORS.purple;
                                 const state = liveState[key];
+                                const showBefore = dragKey && dragKey !== key && insertInfo?.sectionId === id && insertInfo.index === idx;
                                 return (
-                                    <div
-                                        key={key}
-                                        className={`le-card ${svc.hidden ? 'le-card-hidden' : ''} ${dragKey === key ? 'le-card-dragging' : ''}`}
-                                        draggable
-                                        onDragStart={e => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; }}
-                                        onDragEnd={() => { setDragKey(null); setDropTarget(null); }}
-                                    >
-                                        <div className="le-card-grip"><GripVertical size={14} /></div>
-                                        <div className="le-card-icon" style={{ background: c.bg }}>
-                                            <SIcon size={16} color={c.stroke} strokeWidth={1.8} />
+                                    <Fragment key={key}>
+                                        {showBefore && <div className="le-drop-line" />}
+                                        <div
+                                            className={`le-card ${svc.hidden ? 'le-card-hidden' : ''} ${dragKey === key ? 'le-card-dragging' : ''}`}
+                                            draggable
+                                            onDragStart={e => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; }}
+                                            onDragEnd={() => { setDragKey(null); setDropTarget(null); setInsertInfo(null); }}
+                                            onDragOver={e => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                e.dataTransfer.dropEffect = 'move';
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                setInsertInfo({ sectionId: id, index: e.clientY < rect.top + rect.height / 2 ? idx : idx + 1 });
+                                                setDropTarget(id);
+                                            }}
+                                        >
+                                            <div className="le-card-grip"><GripVertical size={14} /></div>
+                                            <div className="le-card-icon" style={{ background: c.bg }}>
+                                                <SIcon size={16} color={c.stroke} strokeWidth={1.8} />
+                                            </div>
+                                            <div className="le-card-info">
+                                                <div className="le-card-name">{svc.name}</div>
+                                                <div className="le-card-desc">{svc.desc || key}</div>
+                                            </div>
+                                            {state && (
+                                                <span className={`card-state-dot ${state === 'running' ? 'running' : 'stopped'}`}
+                                                    style={{ position: 'static', flexShrink: 0 }} />
+                                            )}
+                                            {svc.hidden && <EyeOff size={12} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
+                                            <button className="le-icon-btn" onClick={() => setEditCard(key)} title="Modifier">
+                                                <Pencil size={11} />
+                                            </button>
                                         </div>
-                                        <div className="le-card-info">
-                                            <div className="le-card-name">{svc.name}</div>
-                                            <div className="le-card-desc">{svc.desc || key}</div>
-                                        </div>
-                                        {state && (
-                                            <span className={`card-state-dot ${state === 'running' ? 'running' : 'stopped'}`}
-                                                style={{ position: 'static', flexShrink: 0 }} />
-                                        )}
-                                        {svc.hidden && <EyeOff size={12} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
-                                        <button className="le-icon-btn" onClick={() => setEditCard(key)} title="Modifier">
-                                            <Pencil size={11} />
-                                        </button>
-                                    </div>
+                                    </Fragment>
                                 );
                             })}
-                            {items.length === 0 && statics.length === 0 && (
+                            {dragKey && insertInfo?.sectionId === id && insertInfo.index === items.length && (
+                                <div className="le-drop-line" />
+                            )}
+                            {items.length === 0 && statics.length === 0 && !dragKey && (
                                 <div className="le-empty">Glisser des cartes ici</div>
                             )}
                         </div>
@@ -275,7 +334,7 @@ function CardEditModal({ svc, onSave, onDelete, onClose }: {
                 <label className="le-label">URL</label>
                 <input value={form.url || ''} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://..." />
 
-                <label className="le-label">Icône</label>
+                <label className="le-label">Ic&ocirc;ne</label>
                 <div className="le-icon-picker">
                     {ICON_NAMES.map(name => {
                         const I = getIcon(name);
@@ -305,9 +364,10 @@ function CardEditModal({ svc, onSave, onDelete, onClose }: {
                     ))}
                 </div>
 
-                <label className="le-label">Ordre</label>
-                <input type="number" value={form.order ?? 0}
-                    onChange={e => setForm({ ...form, order: parseInt(e.target.value) || 0 })} />
+                <label className="le-checkbox">
+                    <input type="checkbox" checked={!!form.bot} onChange={e => setForm({ ...form, bot: e.target.checked })} />
+                    Monitoring bots
+                </label>
 
                 <label className="le-checkbox">
                     <input type="checkbox" checked={!!form.hidden} onChange={e => setForm({ ...form, hidden: e.target.checked })} />
@@ -344,7 +404,7 @@ function SectionEditModal({ section, id, onSave, onDelete, onClose }: {
                 <label className="le-label">Nom</label>
                 <input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} />
 
-                <label className="le-label">Icône</label>
+                <label className="le-label">Ic&ocirc;ne</label>
                 <div className="le-icon-picker">
                     {ICON_NAMES.map(name => {
                         const I = getIcon(name);
@@ -407,11 +467,11 @@ function AddSectionModal({ existing, onAdd, onClose }: {
                 <input value={label} onChange={e => setLabel(e.target.value)} placeholder="Ex: Monitoring" autoFocus />
 
                 {id && <p className="le-hint">ID : {id}</p>}
-                {id && existing.includes(id) && <p className="le-error">Cette section existe déjà</p>}
+                {id && existing.includes(id) && <p className="le-error">Cette section existe d&eacute;j&agrave;</p>}
 
                 <div className="modal-buttons" style={{ marginTop: 16 }}>
                     <button className="btn btn-ghost" onClick={onClose}>Annuler</button>
-                    <button className="btn btn-primary" disabled={!valid} onClick={() => onAdd(id, label.trim())}>Créer</button>
+                    <button className="btn btn-primary" disabled={!valid} onClick={() => onAdd(id, label.trim())}>Cr&eacute;er</button>
                 </div>
             </div>
         </div>

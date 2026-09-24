@@ -445,10 +445,6 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/admin/bots') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         const layout = loadLayout();
-        const sectionDefs = layout.sections || {};
-        const botSections = Object.entries(sectionDefs)
-            .filter(([, def]) => def.adminOnly && !def.hidden)
-            .map(([id]) => id);
 
         let containers;
         try {
@@ -465,7 +461,7 @@ const server = http.createServer(async (req, res) => {
             const key = serviceName || resourceName;
             if (!key) continue;
             const svc = layout.services[key];
-            if (!svc || !botSections.includes(svc.section)) continue;
+            if (!svc || !svc.bot) continue;
             if (svc.hidden) continue;
             bots.push({
                 id: c.Id.slice(0, 12),
