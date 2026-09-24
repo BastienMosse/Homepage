@@ -15,7 +15,7 @@ const COOKIE_MAX_AGE = 86400 * 7;
 
 const SKIP_CONTAINERS = new Set([
     'coolify', 'coolify-proxy', 'coolify-db', 'coolify-redis',
-    'coolify-realtime', 'coolify-sentinel', 'errorpages',
+    'coolify-realtime', 'coolify-sentinel',
 ]);
 
 const MIME = {

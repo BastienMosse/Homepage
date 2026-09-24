@@ -8,6 +8,7 @@
     "network-learning": { "name": "Network Learning", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Cours réseau interactifs", "order": 3 },
     "outline": { "name": "Outline", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Wiki & documentation", "order": 4 },
     "freshrss": { "name": "FreshRSS", "section": "sites", "icon": "globe", "color": "amber", "desc": "Agrégateur de flux RSS", "order": 5 },
+    "errorpages": { "name": "Error Pages", "section": "services", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "order": 2 },
     "menestrel": { "name": "Menestrel", "section": "services", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "order": 1 }
   },
   "static": [
