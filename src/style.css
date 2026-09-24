@@ -782,6 +782,285 @@ body::before {
     font-style: italic;
 }
 
+/* --- Layout Editor --- */
+.layout-editor {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 16px;
+}
+.le-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+.le-header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    flex: 1;
+}
+.le-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.le-saved {
+    font-size: .72rem;
+    color: #34d399;
+    font-family: 'JetBrains Mono', monospace;
+}
+.btn-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    font-size: .75rem;
+}
+.le-section {
+    margin-bottom: 20px;
+    border: 2px dashed transparent;
+    border-radius: 14px;
+    padding: 16px;
+    transition: border-color .2s ease, background .2s ease;
+}
+.le-drop-target {
+    border-color: var(--accent);
+    background: rgba(124,108,240,0.04);
+}
+.le-section-hidden {
+    opacity: 0.45;
+}
+.le-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--text-dim);
+}
+.le-section-header svg { opacity: .5; flex-shrink: 0; }
+.le-section-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+.le-badge {
+    font-size: .58rem;
+    padding: 2px 7px;
+    border-radius: 8px;
+    background: rgba(124,108,240,0.15);
+    color: #a99bf7;
+    letter-spacing: normal;
+    text-transform: none;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.le-badge-dim {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-dim);
+}
+.le-icon-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-dim);
+    padding: 4px;
+    cursor: pointer;
+    display: flex;
+    flex-shrink: 0;
+    transition: all .2s ease;
+}
+.le-icon-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+    border-color: var(--border-hover);
+}
+.le-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.le-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: grab;
+    transition: all .2s ease;
+    user-select: none;
+}
+.le-card:active { cursor: grabbing; }
+.le-card:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-hover);
+}
+.le-card-dragging { opacity: 0.35; }
+.le-card-hidden { opacity: 0.4; }
+.le-card-static { cursor: default; opacity: 0.6; }
+.le-card-static .le-card-grip { opacity: 0.2; cursor: default; }
+.le-card-grip {
+    color: var(--text-dim);
+    flex-shrink: 0;
+    cursor: grab;
+}
+.le-card-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+.le-card-info { flex: 1; min-width: 0; }
+.le-card-name {
+    font-size: .82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.le-card-desc {
+    font-size: .66rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.le-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: .75rem;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+}
+.le-add-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 14px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: .78rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .2s ease;
+    margin-top: 4px;
+}
+.le-add-section:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+    background: var(--surface);
+}
+.le-open-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: .78rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .2s ease;
+    margin-bottom: 20px;
+}
+.le-open-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--border-hover);
+    color: var(--text);
+}
+.le-modal { max-width: 420px; }
+.le-label {
+    display: block;
+    font-size: .68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    margin-top: 14px;
+}
+.le-modal .le-label:first-of-type { margin-top: 0; }
+.le-icon-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.le-icon-option {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+.le-icon-option:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+.le-icon-option.active {
+    background: rgba(124,108,240,0.15);
+    border-color: rgba(124,108,240,0.4);
+    color: #a99bf7;
+}
+.le-color-grid {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.le-color-swatch {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+.le-color-swatch.active {
+    border-color: var(--text);
+    transform: scale(1.2);
+    box-shadow: 0 0 8px rgba(255,255,255,0.15);
+}
+.le-color-swatch:hover { transform: scale(1.1); }
+.le-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .78rem;
+    color: var(--text);
+    margin-top: 12px;
+    cursor: pointer;
+}
+.le-checkbox input[type="checkbox"] { accent-color: var(--accent); }
+.le-hint {
+    font-size: .68rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 4px;
+}
+.le-error {
+    font-size: .68rem;
+    color: #e2685f;
+    margin-top: 4px;
+}
+
 /* --- Footer --- */
 .footer {
     text-align: center;

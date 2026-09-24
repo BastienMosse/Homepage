@@ -3,6 +3,7 @@ import {
     HardDrive, Server, ShieldCheck, Lock, Play, Square,
     RotateCw, Activity, type LucideIcon, ChevronDown, Bot,
     Cpu, MemoryStick, HardDriveDownload, Clock, Gauge,
+    AlertTriangle, Settings, Inbox,
 } from 'lucide-react';
 
 const MAP: Record<string, LucideIcon> = {
@@ -26,11 +27,16 @@ const MAP: Record<string, LucideIcon> = {
     disk: HardDriveDownload,
     clock: Clock,
     gauge: Gauge,
+    'alert-triangle': AlertTriangle,
+    settings: Settings,
+    inbox: Inbox,
 };
 
 export function getIcon(name: string): LucideIcon {
     return MAP[name] || Shield;
 }
+
+export const ICON_NAMES = Object.keys(MAP);
 
 export const COLORS: Record<string, { bg: string; stroke: string; glow: string }> = {
     purple:  { bg: 'rgba(124,108,240,0.12)', stroke: '#7c6cf0', glow: 'rgba(124,108,240,0.06)' },
@@ -41,3 +47,5 @@ export const COLORS: Record<string, { bg: string; stroke: string; glow: string }
     cyan:    { bg: 'rgba(34,211,238,0.12)',   stroke: '#22d3ee', glow: 'rgba(34,211,238,0.06)' },
     indigo:  { bg: 'rgba(99,102,241,0.12)',   stroke: '#6366f1', glow: 'rgba(99,102,241,0.06)' },
 };
+
+export const COLOR_NAMES = Object.keys(COLORS);

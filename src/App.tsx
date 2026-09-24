@@ -5,7 +5,8 @@ import ServerStatsPanel from './components/ServerStats.tsx';
 import LoginModal from './components/LoginModal.tsx';
 import ContainerModal from './components/ContainerModal.tsx';
 import BotMonitor from './components/BotMonitor.tsx';
-import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut, Bot, ExternalLink } from 'lucide-react';
+import LayoutEditor from './components/LayoutEditor.tsx';
+import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut, Bot, ExternalLink, Settings } from 'lucide-react';
 import ServiceCard from './components/ServiceCard.tsx';
 
 export default function App() {
@@ -18,12 +19,16 @@ export default function App() {
     const [stats, setStats] = useState<ServerStats | null>(null);
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
     const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
-    const [page, setPage] = useState<'home' | 'bots'>('home');
+    const [page, setPage] = useState<'home' | 'bots' | 'layout'>('home');
+
+    const loadPublic = useCallback(() => {
+        fetch('/api/config').then(r => r.json()).then(d => setSections(d.sections || []));
+    }, []);
 
     useEffect(() => {
-        fetch('/api/config').then(r => r.json()).then(d => setSections(d.sections || []));
+        loadPublic();
         fetch('/api/auth/check').then(r => r.json()).then(d => setAuthed(d.authed));
-    }, []);
+    }, [loadPublic]);
 
     const loadAdmin = useCallback(() => {
         fetch('/api/admin/containers').then(r => r.json()).then(d => setGroups(d.containers || []));
@@ -57,6 +62,16 @@ export default function App() {
                 <div className="glow glow-1" />
                 <div className="glow glow-2" />
                 <BotMonitor onBack={() => setPage('home')} />
+            </>
+        );
+    }
+
+    if (page === 'layout' && authed) {
+        return (
+            <>
+                <div className="glow glow-1" />
+                <div className="glow glow-2" />
+                <LayoutEditor onBack={() => { setPage('home'); loadPublic(); loadAdmin(); }} />
             </>
         );
     }
@@ -127,6 +142,12 @@ export default function App() {
                                 </div>
                             </div>
                         ))}
+
+                        {/* Layout editor button */}
+                        <button className="le-open-btn" onClick={() => setPage('layout')}>
+                            <Settings size={14} />
+                            Modifier le layout
+                        </button>
 
                         {/* Container monitoring */}
                         <div className="section" style={{ animationDelay: '.15s' }}>

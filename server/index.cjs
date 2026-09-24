@@ -9,6 +9,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const PROC_DIR = process.env.PROC_DIR || '/host/proc';
+const LAYOUT_FILE = process.env.LAYOUT_FILE || path.join(DATA_DIR, 'layout.json');
 
 const COOKIE_NAME = 'lab_admin';
 const COOKIE_MAX_AGE = 86400 * 7;
@@ -54,10 +55,12 @@ function isAuthed(req) {
     return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected));
 }
 
-function parseBody(req) {
+function parseBody(req, maxSize) {
+    if (!maxSize) maxSize = 4096;
     return new Promise(resolve => {
         const chunks = [];
-        req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
+        let size = 0;
+        req.on('data', c => { size += c.length; if (size > maxSize) { req.destroy(); return; } chunks.push(c); });
         req.on('end', () => resolve(Buffer.concat(chunks).toString()));
     });
 }
@@ -67,13 +70,51 @@ function json(res, status, data) {
     res.end(JSON.stringify(data));
 }
 
-// --- Config ---
+// --- Config (default seed) ---
 
 function loadConfig() {
     const file = path.join(DATA_DIR, 'services.json');
     if (!fs.existsSync(file)) return { apps: {}, static: [], sections: {} };
     try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
     catch { return { apps: {}, static: [], sections: {} }; }
+}
+
+// --- Layout persistence ---
+
+let layoutCache = null;
+
+function loadLayout() {
+    if (layoutCache) return layoutCache;
+    if (fs.existsSync(LAYOUT_FILE)) {
+        try {
+            layoutCache = JSON.parse(fs.readFileSync(LAYOUT_FILE, 'utf8'));
+            if (layoutCache.sections && layoutCache.services) return layoutCache;
+        } catch {}
+    }
+    const config = loadConfig();
+    const layout = {
+        sections: {
+            ...(config.sections || {}),
+            _new: { label: 'Non classé', icon: 'inbox', order: 99, adminOnly: true, hidden: true },
+        },
+        services: {},
+        static: config.static || [],
+    };
+    let order = 0;
+    for (const [key, app] of Object.entries(config.apps || {})) {
+        layout.services[key] = { ...app, order: order++ };
+    }
+    saveLayout(layout);
+    return layout;
+}
+
+function saveLayout(layout) {
+    layoutCache = layout;
+    try {
+        const dir = path.dirname(LAYOUT_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(LAYOUT_FILE, JSON.stringify(layout, null, 2));
+    } catch (e) { console.error('Failed to save layout:', e.message); }
 }
 
 // --- Docker ---
@@ -115,7 +156,8 @@ async function discover() {
     const now = Date.now();
     if (cachedDiscovery && now - lastDiscoveryTime < DISCOVERY_TTL) return cachedDiscovery;
 
-    const config = loadConfig();
+    const layout = loadLayout();
+
     let containers;
     try {
         containers = await dockerRequest('GET', '/containers/json?all=true');
@@ -124,6 +166,7 @@ async function discover() {
 
     const items = [];
     const groupMap = {};
+    let layoutChanged = false;
 
     for (const c of containers) {
         const labels = c.Labels || {};
@@ -136,48 +179,68 @@ async function discover() {
         if (SKIP_CONTAINERS.has(serviceName) || SKIP_CONTAINERS.has(resourceName) || SKIP_CONTAINERS.has(dockerName)) continue;
         if (!serviceName && !resourceName) continue;
 
+        const key = serviceName || resourceName;
         const serviceId = labels['coolify.serviceId'] || '';
-        const groupKey = serviceId || serviceName || resourceName;
+        const groupKey = serviceId || key;
 
         if (!groupMap[groupKey]) {
-            groupMap[groupKey] = { containers: [] };
+            groupMap[groupKey] = { containers: [], key };
         }
         groupMap[groupKey].containers.push({
             id: c.Id.slice(0, 12),
-            name: serviceName || resourceName || dockerName,
+            name: key,
             state: c.State,
             status: c.Status,
         });
 
-        const appConfig = config.apps?.[serviceName] || config.apps?.[resourceName];
-        if (appConfig && !groupMap[groupKey].matched) {
-            groupMap[groupKey].matched = true;
-            groupMap[groupKey].label = appConfig.name || serviceName;
-            items.push({
-                name: appConfig.name || serviceName,
-                desc: appConfig.desc || '',
-                url: extractUrl(labels) || appConfig.url || '',
-                icon: appConfig.icon || 'server',
-                color: appConfig.color || 'purple',
-                section: appConfig.section || 'sites',
-                state: c.State,
-                order: appConfig.order || 99,
-            });
+        if (groupMap[groupKey].matched) continue;
+        groupMap[groupKey].matched = true;
+
+        let svc = layout.services[key];
+        if (!svc) {
+            const url = extractUrl(labels);
+            svc = {
+                name: key,
+                icon: 'server',
+                color: 'purple',
+                desc: '',
+                url: url || '',
+                section: '_new',
+                order: Object.keys(layout.services).length,
+            };
+            layout.services[key] = svc;
+            layoutChanged = true;
         }
+
+        groupMap[groupKey].label = svc.name;
+        items.push({
+            key,
+            name: svc.name,
+            desc: svc.desc || '',
+            url: svc.url || extractUrl(labels) || '',
+            icon: svc.icon || 'server',
+            color: svc.color || 'purple',
+            section: svc.section || '_new',
+            state: c.State,
+            order: svc.order ?? 99,
+            hidden: !!svc.hidden,
+        });
     }
+
+    if (layoutChanged) saveLayout(layout);
 
     const allContainers = Object.values(groupMap).map(g => ({
         label: g.label || g.containers[0].name,
         containers: g.containers,
     }));
 
-    if (config.static) {
-        for (const entry of config.static) {
-            items.push({ ...entry, state: 'static', order: entry.order || 0 });
+    if (layout.static) {
+        for (const entry of layout.static) {
+            items.push({ ...entry, state: 'static', order: entry.order ?? 0, hidden: !!entry.hidden });
         }
     }
 
-    const sectionDefs = config.sections || {};
+    const sectionDefs = layout.sections || {};
     const sectionMap = {};
 
     for (const item of items) {
@@ -188,17 +251,32 @@ async function discover() {
                 id: sid,
                 label: def.label,
                 icon: def.icon,
-                order: def.order,
+                order: def.order ?? 99,
                 adminOnly: !!def.adminOnly,
+                hidden: !!def.hidden,
                 items: [],
             };
         }
         sectionMap[sid].items.push(item);
     }
 
+    for (const [id, def] of Object.entries(sectionDefs)) {
+        if (!sectionMap[id]) {
+            sectionMap[id] = {
+                id,
+                label: def.label,
+                icon: def.icon,
+                order: def.order ?? 99,
+                adminOnly: !!def.adminOnly,
+                hidden: !!def.hidden,
+                items: [],
+            };
+        }
+    }
+
     const sections = Object.values(sectionMap)
         .sort((a, b) => a.order - b.order)
-        .map(s => ({ ...s, items: s.items.sort((a, b) => a.order - b.order) }));
+        .map(s => ({ ...s, items: s.items.sort((a, b) => (a.order ?? 99) - (b.order ?? 99)) }));
 
     cachedDiscovery = { sections, allContainers };
     lastDiscoveryTime = now;
@@ -269,7 +347,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url === '/api/config') {
         const { sections } = await discover();
-        json(res, 200, { sections: sections.filter(s => !s.adminOnly) });
+        const filtered = sections
+            .filter(s => !s.adminOnly && !s.hidden)
+            .map(s => ({ ...s, items: s.items.filter(i => !i.hidden) }))
+            .filter(s => s.items.length > 0);
+        json(res, 200, { sections: filtered });
         return;
     }
 
@@ -317,16 +399,55 @@ const server = http.createServer(async (req, res) => {
     if (url === '/api/admin/services') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         const { sections } = await discover();
-        json(res, 200, { sections: sections.filter(s => s.adminOnly) });
+        const filtered = sections
+            .filter(s => s.adminOnly && !s.hidden)
+            .map(s => ({ ...s, items: s.items.filter(i => !i.hidden) }));
+        json(res, 200, { sections: filtered });
+        return;
+    }
+
+    if (url === '/api/admin/layout' && req.method === 'GET') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const layout = loadLayout();
+        let containers;
+        try {
+            containers = await dockerRequest('GET', '/containers/json?all=true');
+            if (!Array.isArray(containers)) containers = [];
+        } catch { containers = []; }
+        const states = {};
+        for (const c of containers) {
+            const labels = c.Labels || {};
+            const key = labels['coolify.serviceName'] || labels['coolify.resourceName'] || '';
+            if (key) states[key] = c.State;
+        }
+        json(res, 200, { layout, states });
+        return;
+    }
+
+    if (url === '/api/admin/layout' && req.method === 'PUT') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const body = await parseBody(req, 65536);
+        try {
+            const data = JSON.parse(body);
+            if (data.sections && data.services) {
+                saveLayout(data);
+                cachedDiscovery = null;
+                json(res, 200, { ok: true });
+            } else {
+                json(res, 400, { error: 'Invalid layout' });
+            }
+        } catch {
+            json(res, 400, { error: 'Invalid JSON' });
+        }
         return;
     }
 
     if (url === '/api/admin/bots') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const config = loadConfig();
-        const sectionDefs = config.sections || {};
+        const layout = loadLayout();
+        const sectionDefs = layout.sections || {};
         const botSections = Object.entries(sectionDefs)
-            .filter(([, def]) => def.adminOnly)
+            .filter(([, def]) => def.adminOnly && !def.hidden)
             .map(([id]) => id);
 
         let containers;
@@ -341,15 +462,18 @@ const server = http.createServer(async (req, res) => {
             if (labels['coolify.managed'] !== 'true') continue;
             const serviceName = labels['coolify.serviceName'] || '';
             const resourceName = labels['coolify.resourceName'] || '';
-            const appConfig = config.apps?.[serviceName] || config.apps?.[resourceName];
-            if (!appConfig || !botSections.includes(appConfig.section)) continue;
+            const key = serviceName || resourceName;
+            if (!key) continue;
+            const svc = layout.services[key];
+            if (!svc || !botSections.includes(svc.section)) continue;
+            if (svc.hidden) continue;
             bots.push({
                 id: c.Id.slice(0, 12),
-                name: appConfig.name || serviceName,
-                key: serviceName || resourceName,
-                desc: appConfig.desc || '',
-                icon: appConfig.icon || 'bot',
-                color: appConfig.color || 'purple',
+                name: svc.name || key,
+                key,
+                desc: svc.desc || '',
+                icon: svc.icon || 'bot',
+                color: svc.color || 'purple',
                 state: c.State,
                 status: c.Status,
             });
@@ -452,6 +576,7 @@ server.listen(PORT, () => {
     console.log(`Dashboard on port ${PORT}`);
     if (ADMIN_TOKEN) console.log('Admin auth enabled');
     else console.log('Warning: ADMIN_TOKEN not set, admin disabled');
+    console.log(`Layout file: ${LAYOUT_FILE}`);
 });
 
 process.on('SIGTERM', () => { clearInterval(cpuInterval); server.close(); });

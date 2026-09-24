@@ -1,23 +1,22 @@
 {
   "apps": {
-    "headplane": { "name": "Heimdall", "section": "infra", "icon": "shield-check", "color": "cyan", "desc": "Gestion du VPN", "url": "https://heimdall.lucipher-lab.fr", "order": 2 },
-    "yggdrasil": { "name": "Yggdrasil", "section": "infra", "icon": "hard-drive", "color": "amber", "desc": "Stockage & partage de fichiers", "order": 3 },
-    "cyber-dashboard": { "name": "Cyber Dashboard", "section": "sites", "icon": "shield-check", "color": "red", "desc": "Veille sécurité & menaces", "order": 0 },
-    "relais": { "name": "Relais", "section": "sites", "icon": "shield", "color": "mint", "desc": "Messagerie chiffrée E2E", "order": 1 },
-    "whisper": { "name": "Whisper", "section": "sites", "icon": "message-circle", "color": "emerald", "desc": "Secrets éphémères chiffrés", "order": 2 },
-    "network-learning": { "name": "Network Learning", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Cours réseau interactifs", "order": 3 },
-    "outline": { "name": "Outline", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Wiki & documentation", "order": 4 },
-    "freshrss": { "name": "FreshRSS", "section": "sites", "icon": "globe", "color": "amber", "desc": "Agrégateur de flux RSS", "order": 5 },
-    "error-pages": { "name": "Error Pages", "section": "services", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "order": 1 },
-    "menestrel": { "name": "Menestrel", "section": "bots", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "order": 1 }
+    "headplane": { "name": "Heimdall", "icon": "shield-check", "color": "cyan", "desc": "Gestion du VPN", "url": "https://heimdall.lucipher-lab.fr", "section": "infra" },
+    "yggdrasil": { "name": "Yggdrasil", "icon": "hard-drive", "color": "amber", "desc": "Stockage & partage de fichiers", "section": "infra" },
+    "cyber-dashboard": { "name": "Cyber Dashboard", "icon": "shield-check", "color": "red", "desc": "Veille sécurité & menaces", "section": "sites" },
+    "relais": { "name": "Relais", "icon": "shield", "color": "mint", "desc": "Messagerie chiffrée E2E", "section": "sites" },
+    "whisper": { "name": "Whisper", "icon": "message-circle", "color": "emerald", "desc": "Secrets éphémères chiffrés", "section": "sites" },
+    "network-learning": { "name": "Network Learning", "icon": "graduation-cap", "color": "purple", "desc": "Cours réseau interactifs", "section": "sites" },
+    "outline": { "name": "Outline", "icon": "graduation-cap", "color": "purple", "desc": "Wiki & documentation", "section": "sites" },
+    "freshrss": { "name": "FreshRSS", "icon": "globe", "color": "amber", "desc": "Agrégateur de flux RSS", "section": "sites" },
+    "error-pages": { "name": "Error Pages", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "section": "services" },
+    "menestrel": { "name": "Menestrel", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "section": "services" }
   },
   "static": [
-    { "name": "Odin", "section": "infra", "icon": "server", "color": "red", "desc": "Gestion des services", "url": "https://odin.lucipher-lab.fr", "order": 1 }
+    { "name": "Odin", "section": "infra", "icon": "server", "color": "red", "desc": "Gestion des services", "url": "https://odin.lucipher-lab.fr", "order": 0 }
   ],
   "sections": {
     "infra": { "label": "Infrastructure", "icon": "server", "order": 1 },
     "sites": { "label": "Sites", "icon": "globe", "order": 2 },
-    "services": { "label": "Services", "icon": "settings", "order": 3 },
-    "bots": { "label": "Bots", "icon": "bot", "order": 4, "adminOnly": true }
+    "services": { "label": "Services", "icon": "settings", "order": 3, "adminOnly": true }
   }
 }

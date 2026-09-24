@@ -1,10 +1,12 @@
 export interface ServiceItem {
+    key?: string;
     name: string;
     desc: string;
     url: string;
     icon: string;
     color: string;
     state?: string;
+    hidden?: boolean;
 }
 
 export interface Section {
@@ -13,6 +15,7 @@ export interface Section {
     icon: string;
     items: ServiceItem[];
     adminOnly?: boolean;
+    hidden?: boolean;
 }
 
 export interface Container {
