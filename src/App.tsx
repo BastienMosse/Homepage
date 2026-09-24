@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Section, ContainerGroup, ServerStats } from './types.ts';
+import type { Section, Container, ContainerGroup, ServerStats } from './types.ts';
 import SectionBlock from './components/SectionBlock.tsx';
 import ServerStatsPanel from './components/ServerStats.tsx';
 import LoginModal from './components/LoginModal.tsx';
+import ContainerModal from './components/ContainerModal.tsx';
 import { Play, Square, RotateCw, ShieldCheck, Lock, Activity, LogOut, Bot } from 'lucide-react';
 import ServiceCard from './components/ServiceCard.tsx';
 
@@ -15,6 +16,7 @@ export default function App() {
     const [adminSections, setAdminSections] = useState<Section[]>([]);
     const [stats, setStats] = useState<ServerStats | null>(null);
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
+    const [selectedContainer, setSelectedContainer] = useState<Container | null>(null);
 
     useEffect(() => {
         fetch('/api/config').then(r => r.json()).then(d => setSections(d.sections || []));
@@ -129,7 +131,7 @@ export default function App() {
                                             {g.containers.map(c => (
                                                 <div key={c.id} className="container-row">
                                                     <span className={`status-dot ${statusClass(c.state)}`} />
-                                                    <span className="container-name" title={c.status}>{c.name}</span>
+                                                    <span className="container-name clickable" title={c.status} onClick={() => setSelectedContainer(c)}>{c.name}</span>
                                                     <div className="container-actions">
                                                         {c.state !== 'running' && (
                                                             <button title="Démarrer" onClick={() => containerAction(c.id, 'start')} disabled={loadingAction === `${c.id}-start`}>
@@ -162,6 +164,14 @@ export default function App() {
 
             {showLogin && (
                 <LoginModal onSuccess={() => { setShowLogin(false); setAuthed(true); }} onClose={() => setShowLogin(false)} />
+            )}
+
+            {selectedContainer && (
+                <ContainerModal
+                    container={selectedContainer}
+                    onClose={() => setSelectedContainer(null)}
+                    onAction={(id, action) => { containerAction(id, action); }}
+                />
             )}
         </>
     );

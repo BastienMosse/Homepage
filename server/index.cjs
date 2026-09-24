@@ -333,6 +333,48 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    const containerLogs = url.match(/^\/api\/admin\/containers\/([a-f0-9]+)\/logs$/);
+    if (containerLogs) {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const [, id] = containerLogs;
+        try {
+            const logs = await dockerRequest('GET', `/containers/${id}/logs?stdout=true&stderr=true&tail=150&timestamps=true`);
+            const lines = typeof logs === 'string'
+                ? logs.split('\n').map(l => l.replace(/^.{8}/, '').trim()).filter(Boolean)
+                : [];
+            json(res, 200, { logs: lines });
+        } catch (e) {
+            json(res, 500, { error: e.message });
+        }
+        return;
+    }
+
+    const containerStats = url.match(/^\/api\/admin\/containers\/([a-f0-9]+)\/stats$/);
+    if (containerStats) {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const [, id] = containerStats;
+        try {
+            const raw = await dockerRequest('GET', `/containers/${id}/stats?stream=false`);
+            const cpuDelta = raw.cpu_stats?.cpu_usage?.total_usage - raw.precpu_stats?.cpu_usage?.total_usage || 0;
+            const sysDelta = raw.cpu_stats?.system_cpu_usage - raw.precpu_stats?.system_cpu_usage || 0;
+            const cpuCount = raw.cpu_stats?.online_cpus || 1;
+            const cpuPercent = sysDelta > 0 ? Math.round(cpuDelta / sysDelta * cpuCount * 10000) / 100 : 0;
+            const memUsed = raw.memory_stats?.usage - (raw.memory_stats?.stats?.cache || 0);
+            const memLimit = raw.memory_stats?.limit || 0;
+            const info = await dockerRequest('GET', `/containers/${id}/json`);
+            const startedAt = info.State?.StartedAt || '';
+            json(res, 200, {
+                cpu: cpuPercent,
+                memory: { used: memUsed || 0, limit: memLimit },
+                state: info.State?.Status || 'unknown',
+                startedAt,
+            });
+        } catch (e) {
+            json(res, 500, { error: e.message });
+        }
+        return;
+    }
+
     const containerAction = url.match(/^\/api\/admin\/containers\/([a-f0-9]+)\/(start|stop|restart)$/);
     if (containerAction && req.method === 'POST') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });

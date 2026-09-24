@@ -27,6 +27,13 @@ export interface ContainerGroup {
     containers: Container[];
 }
 
+export interface ContainerDetail {
+    cpu: number;
+    memory: { used: number; limit: number };
+    state: string;
+    startedAt: string;
+}
+
 export interface ServerStats {
     cpu: number;
     memory: { total: number; used: number; percent: number };
