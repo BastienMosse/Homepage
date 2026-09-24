@@ -15,7 +15,7 @@ const COOKIE_MAX_AGE = 86400 * 7;
 
 const SKIP_CONTAINERS = new Set([
     'coolify', 'coolify-proxy', 'coolify-db', 'coolify-redis',
-    'coolify-realtime', 'coolify-sentinel', 'homepage',
+    'coolify-realtime', 'coolify-sentinel', 'errorpages',
 ]);
 
 const MIME = {
@@ -123,7 +123,7 @@ async function discover() {
     } catch { containers = []; }
 
     const items = [];
-    const allContainers = [];
+    const groupMap = {};
 
     for (const c of containers) {
         const labels = c.Labels || {};
@@ -136,14 +136,25 @@ async function discover() {
         if (SKIP_CONTAINERS.has(serviceName) || SKIP_CONTAINERS.has(resourceName) || SKIP_CONTAINERS.has(dockerName)) continue;
         if (!serviceName && !resourceName) continue;
 
-        allContainers.push({
+        const serviceId = labels['coolify.serviceId'] || '';
+        const groupKey = serviceId || serviceName || resourceName;
+
+        if (!groupMap[groupKey]) {
+            groupMap[groupKey] = { containers: [] };
+        }
+        groupMap[groupKey].containers.push({
             id: c.Id.slice(0, 12),
-            name: serviceName || resourceName || (c.Names?.[0] || '').replace(/^\//, ''),
+            name: serviceName || resourceName || dockerName,
             state: c.State,
             status: c.Status,
         });
 
         const appConfig = config.apps?.[serviceName] || config.apps?.[resourceName];
+        if (appConfig && !groupMap[groupKey].matched) {
+            groupMap[groupKey].matched = true;
+            groupMap[groupKey].label = appConfig.name || serviceName;
+        }
+
         if (!appConfig) continue;
 
         items.push({
@@ -157,6 +168,11 @@ async function discover() {
             order: appConfig.order || 99,
         });
     }
+
+    const allContainers = Object.values(groupMap).map(g => ({
+        label: g.label || g.containers[0].name,
+        containers: g.containers,
+    }));
 
     if (config.static) {
         for (const entry of config.static) {

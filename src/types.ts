@@ -22,6 +22,11 @@ export interface Container {
     status: string;
 }
 
+export interface ContainerGroup {
+    label: string;
+    containers: Container[];
+}
+
 export interface ServerStats {
     cpu: number;
     memory: { total: number; used: number; percent: number };
