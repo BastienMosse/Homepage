@@ -8,15 +8,16 @@
     "network-learning": { "name": "Network Learning", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Cours réseau interactifs", "order": 3 },
     "outline": { "name": "Outline", "section": "sites", "icon": "graduation-cap", "color": "purple", "desc": "Wiki & documentation", "order": 4 },
     "freshrss": { "name": "FreshRSS", "section": "sites", "icon": "globe", "color": "amber", "desc": "Agrégateur de flux RSS", "order": 5 },
-    "error-pages": { "name": "Error Pages", "section": "sites", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "order": 6 },
-    "menestrel": { "name": "Menestrel", "section": "services", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "order": 1 }
+    "error-pages": { "name": "Error Pages", "section": "services", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "order": 1 },
+    "menestrel": { "name": "Menestrel", "section": "bots", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "order": 1 }
   },
   "static": [
     { "name": "Odin", "section": "infra", "icon": "server", "color": "red", "desc": "Gestion des services", "url": "https://odin.lucipher-lab.fr", "order": 1 }
   ],
   "sections": {
     "infra": { "label": "Infrastructure", "icon": "server", "order": 1 },
-    "sites": { "label": "Sites & Outils", "icon": "globe", "order": 2 },
-    "services": { "label": "Bots", "icon": "bot", "order": 3, "adminOnly": true }
+    "sites": { "label": "Sites", "icon": "globe", "order": 2 },
+    "services": { "label": "Services", "icon": "settings", "order": 3 },
+    "bots": { "label": "Bots", "icon": "bot", "order": 4, "adminOnly": true }
   }
 }
