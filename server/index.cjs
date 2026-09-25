@@ -277,7 +277,7 @@ async function discover() {
 
     const sections = Object.values(sectionMap)
         .sort((a, b) => a.order - b.order)
-        .map(s => ({ ...s, items: s.items.sort((a, b) => (a.order ?? 99) - (b.order ?? 99)) }));
+        .map(s => ({ ...s, items: s.items.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name)) }));
 
     cachedDiscovery = { sections, allContainers };
     lastDiscoveryTime = now;

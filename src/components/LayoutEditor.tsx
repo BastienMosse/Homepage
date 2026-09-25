@@ -294,14 +294,13 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                                 onDragStart={e => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; }}
                                                 onDragEnd={() => { setDragKey(null); setDropTarget(null); setInsertInfo(null); }}
                                                 onDragOver={e => {
+                                                    if (!dragKey) return;
                                                     e.preventDefault();
                                                     e.stopPropagation();
-                                                    if (dragKey) {
-                                                        e.dataTransfer.dropEffect = 'move';
-                                                        const rect = e.currentTarget.getBoundingClientRect();
-                                                        setInsertInfo({ sectionId: id, index: e.clientY < rect.top + rect.height / 2 ? idx : idx + 1 });
-                                                        setDropTarget(id);
-                                                    }
+                                                    e.dataTransfer.dropEffect = 'move';
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    setInsertInfo({ sectionId: id, index: e.clientY < rect.top + rect.height / 2 ? idx : idx + 1 });
+                                                    setDropTarget(id);
                                                 }}
                                             >
                                                 <div className="le-card-grip"><GripVertical size={14} /></div>

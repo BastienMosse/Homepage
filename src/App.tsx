@@ -116,18 +116,9 @@ export default function App() {
                             </button>
                         </div>
 
-                        {/* Server stats */}
-                        <div className="section" style={{ animationDelay: '.05s' }}>
-                            <div className="section-header">
-                                <Activity size={14} />
-                                Serveur
-                            </div>
-                            <ServerStatsPanel stats={stats} />
-                        </div>
-
                         {/* Admin-only sections (bots/services) */}
                         {adminSections.map(s => (
-                            <div key={s.id} className="section" style={{ animationDelay: '.1s' }}>
+                            <div key={s.id} className="section" style={{ animationDelay: '.05s' }}>
                                 <div className="section-header">
                                     <Bot size={14} />
                                     {s.label}
@@ -148,6 +139,15 @@ export default function App() {
                             <Settings size={14} />
                             Modifier le layout
                         </button>
+
+                        {/* Server stats */}
+                        <div className="section" style={{ animationDelay: '.1s' }}>
+                            <div className="section-header">
+                                <Activity size={14} />
+                                Serveur
+                            </div>
+                            <ServerStatsPanel stats={stats} />
+                        </div>
 
                         {/* Container monitoring */}
                         <div className="section" style={{ animationDelay: '.15s' }}>

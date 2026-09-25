@@ -12,7 +12,7 @@
     "menestrel": { "name": "Menestrel", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "section": "services", "bot": true }
   },
   "static": [
-    { "name": "Odin", "section": "infra", "icon": "server", "color": "red", "desc": "Gestion des services", "url": "https://odin.lucipher-lab.fr", "order": 0 }
+    { "name": "Odin", "section": "infra", "icon": "server", "color": "red", "desc": "Gestion des services", "url": "https://odin.lucipher-lab.fr", "order": -1 }
   ],
   "sections": {
     "infra": { "label": "Infrastructure", "icon": "server", "order": 1 },
