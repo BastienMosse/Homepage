@@ -82,6 +82,11 @@ body::before {
     opacity: 0;
     animation: fadeUp .7s var(--ease) forwards;
 }
+.hero-mark {
+    display: block;
+    margin: 0 auto 14px;
+    filter: drop-shadow(0 0 24px rgba(139,92,246,.35));
+}
 .logo {
     font-size: 2.4rem;
     font-weight: 800;

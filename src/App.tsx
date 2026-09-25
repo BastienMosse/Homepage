@@ -83,6 +83,7 @@ export default function App() {
 
             <div className="page">
                 <header className="hero">
+                    <img className="hero-mark" src="/brand/icons/asgard.svg" alt="Asgard" width={88} height={88} />
                     <div className="logo">lucipher-lab</div>
                     <div className="tagline">Infrastructure & Services</div>
                     <button className="admin-toggle" onClick={() => authed ? setAdminOpen(v => !v) : setShowLogin(true)}>
