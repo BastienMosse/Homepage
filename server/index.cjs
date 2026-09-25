@@ -235,7 +235,23 @@ async function discover() {
         containers: g.containers,
     }));
 
-
+    const matchedKeys = new Set(items.map(i => i.key));
+    for (const [key, svc] of Object.entries(layout.services)) {
+        if (matchedKeys.has(key)) continue;
+        items.push({
+            key,
+            name: svc.name,
+            desc: svc.desc || '',
+            url: svc.url || '',
+            icon: svc.icon || 'server',
+            color: svc.color || 'purple',
+            section: svc.section || '_new',
+            state: 'external',
+            order: svc.order ?? 99,
+            hidden: !!svc.hidden,
+            bot: !!svc.bot,
+        });
+    }
 
     const sectionDefs = layout.sections || {};
     const sectionMap = {};
