@@ -218,11 +218,6 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
                 }}
-                onDrop={e => {
-                    if (!dragSectionId) return;
-                    e.preventDefault();
-                    handleSectionDrop(sortedSections.length);
-                }}
             >
             {sortedSections.map(([id, def], sectionIdx) => {
                 const SectionIcon = getIcon(def.icon);
@@ -258,13 +253,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                             onDrop={e => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                if (dragSectionId) {
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    const dropIdx = e.clientY < rect.top + rect.height / 2 ? sectionIdx : sectionIdx + 1;
-                                    handleSectionDrop(dropIdx);
-                                } else {
-                                    handleDrop(id);
-                                }
+                                if (!dragSectionId) handleDrop(id);
                             }}
                         >
                             <div
@@ -276,6 +265,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                     e.dataTransfer.setData('text/plain', id);
                                 }}
                                 onDragEnd={() => {
+                                    if (sectionDropIndex !== null) handleSectionDrop(sectionDropIndex);
                                     setDragSectionId(null);
                                     setSectionDropIndex(null);
                                 }}
