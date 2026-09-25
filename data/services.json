@@ -11,9 +11,7 @@
     "error-pages": { "name": "Error Pages", "icon": "alert-triangle", "color": "amber", "desc": "Pages d'erreur custom (403/404/503)", "section": "services" },
     "menestrel": { "name": "Menestrel", "icon": "bot", "color": "indigo", "desc": "Bot Discord", "section": "services", "bot": true }
   },
-  "static": [
-    { "name": "Odin", "section": "infra", "icon": "server", "color": "red", "desc": "Gestion des services", "url": "https://odin.lucipher-lab.fr", "order": -1 }
-  ],
+  "static": [],
   "sections": {
     "infra": { "label": "Infrastructure", "icon": "server", "order": 1 },
     "sites": { "label": "Sites", "icon": "globe", "order": 2 },

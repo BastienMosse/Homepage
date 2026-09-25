@@ -98,7 +98,7 @@ function loadLayout() {
             _new: { label: 'Non classé', icon: 'inbox', order: 99, adminOnly: true, hidden: true },
         },
         services: {},
-        static: config.static || [],
+        static: [],
     };
     let order = 0;
     for (const [key, app] of Object.entries(config.apps || {})) {
@@ -235,11 +235,7 @@ async function discover() {
         containers: g.containers,
     }));
 
-    if (layout.static) {
-        for (const entry of layout.static) {
-            items.push({ ...entry, state: 'static', order: entry.order ?? 0, hidden: !!entry.hidden });
-        }
-    }
+
 
     const sectionDefs = layout.sections || {};
     const sectionMap = {};

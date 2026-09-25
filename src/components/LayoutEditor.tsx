@@ -7,7 +7,7 @@ interface LayoutService { name: string; icon: string; color: string; desc: strin
 interface LayoutData {
     sections: Record<string, LayoutSection>;
     services: Record<string, LayoutService>;
-    static: Array<LayoutService & { section: string }>;
+    static: Array<never>;
 }
 
 export default function LayoutEditor({ onBack }: { onBack: () => void }) {
@@ -186,9 +186,6 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
             .sort(([, a], [, b]) => (a.order ?? 99) - (b.order ?? 99));
     }
 
-    function sectionStaticItems(sectionId: string) {
-        return (layout!.static || []).filter(s => s.section === sectionId);
-    }
 
     return (
         <div className="layout-editor">
@@ -222,7 +219,6 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
             {sortedSections.map(([id, def], sectionIdx) => {
                 const SectionIcon = getIcon(def.icon);
                 const items = sectionItems(id);
-                const statics = sectionStaticItems(id);
                 const showSectionDropBefore = dragSectionId && dragSectionId !== id && sectionDropIndex === sectionIdx;
 
                 return (
@@ -288,23 +284,6 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                 </button>
                             </div>
                             <div className="le-cards">
-                                {statics.map((s, i) => {
-                                    const SIcon = getIcon(s.icon);
-                                    const c = COLORS[s.color] || COLORS.purple;
-                                    return (
-                                        <div key={`s-${i}`} className="le-card le-card-static">
-                                            <div className="le-card-grip"><GripVertical size={14} /></div>
-                                            <div className="le-card-icon" style={{ background: c.bg }}>
-                                                <SIcon size={16} color={c.stroke} strokeWidth={1.8} />
-                                            </div>
-                                            <div className="le-card-info">
-                                                <div className="le-card-name">{s.name}</div>
-                                                <div className="le-card-desc">{s.desc}</div>
-                                            </div>
-                                            <span className="le-badge le-badge-dim">statique</span>
-                                        </div>
-                                    );
-                                })}
                                 {items.map(([key, svc], idx) => {
                                     const SIcon = getIcon(svc.icon);
                                     const c = COLORS[svc.color] || COLORS.purple;
@@ -351,7 +330,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                 {dragKey && insertInfo?.sectionId === id && insertInfo.index === items.length && (
                                     <div className="le-drop-line" />
                                 )}
-                                {items.length === 0 && statics.length === 0 && !dragKey && (
+                                {items.length === 0 && !dragKey && (
                                     <div className="le-empty">Glisser des cartes ici</div>
                                 )}
                             </div>
