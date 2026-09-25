@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import { getIcon, COLORS, ICON_NAMES, COLOR_NAMES } from './Icons.tsx';
-import { ArrowLeft, Pencil, GripVertical, Plus, EyeOff, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, GripVertical, Plus, EyeOff, Save, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface LayoutSection { label: string; icon: string; order: number; adminOnly?: boolean; hidden?: boolean; }
 interface LayoutService { name: string; icon: string; color: string; desc: string; url?: string; section: string; order: number; hidden?: boolean; bot?: boolean; }
@@ -123,7 +123,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
         const sorted = Object.entries(layout.sections)
             .sort(([, a], [, b]) => (a.order ?? 99) - (b.order ?? 99));
 
-        const fromIndex = sorted.findIndex(([id]) => id === dragSectionId);
+        const fromIndex = sorted.findIndex(([sid]) => sid === dragSectionId);
         if (fromIndex < 0 || fromIndex === targetIndex) return;
 
         const item = sorted.splice(fromIndex, 1)[0];
@@ -131,13 +131,26 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
         sorted.splice(adjustedTarget, 0, item);
 
         const newSections = { ...layout.sections };
-        sorted.forEach(([id], i) => {
-            newSections[id] = { ...newSections[id], order: i };
+        sorted.forEach(([sid], i) => {
+            newSections[sid] = { ...newSections[sid], order: i };
         });
 
         setLayout({ ...layout, sections: newSections });
         setDragSectionId(null);
         setSectionDropIndex(null);
+    }
+
+    function moveSection(sectionId: string, direction: -1 | 1) {
+        if (!layout) return;
+        const sorted = Object.entries(layout.sections)
+            .sort(([, a], [, b]) => (a.order ?? 99) - (b.order ?? 99));
+        const idx = sorted.findIndex(([sid]) => sid === sectionId);
+        const swapIdx = idx + direction;
+        if (idx < 0 || swapIdx < 0 || swapIdx >= sorted.length) return;
+        const newSections = { ...layout.sections };
+        newSections[sorted[idx][0]] = { ...newSections[sorted[idx][0]], order: swapIdx };
+        newSections[sorted[swapIdx][0]] = { ...newSections[sorted[swapIdx][0]], order: idx };
+        setLayout({ ...layout, sections: newSections });
     }
 
     async function handleSave() {
@@ -199,6 +212,18 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                 </div>
             </div>
 
+            <div
+                onDragOver={e => {
+                    if (!dragSectionId) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                }}
+                onDrop={e => {
+                    if (!dragSectionId) return;
+                    e.preventDefault();
+                    handleSectionDrop(sortedSections.length);
+                }}
+            >
             {sortedSections.map(([id, def], sectionIdx) => {
                 const SectionIcon = getIcon(def.icon);
                 const items = sectionItems(id);
@@ -259,6 +284,14 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                 <span>{def.label}</span>
                                 {def.adminOnly && <span className="le-badge">admin</span>}
                                 {def.hidden && <span className="le-badge le-badge-dim">masqu&eacute;</span>}
+                                <div className="le-section-arrows">
+                                    <button className="le-icon-btn" onClick={e => { e.stopPropagation(); moveSection(id, -1); }} disabled={sectionIdx === 0} title="Monter">
+                                        <ChevronUp size={11} />
+                                    </button>
+                                    <button className="le-icon-btn" onClick={e => { e.stopPropagation(); moveSection(id, 1); }} disabled={sectionIdx === sortedSections.length - 1} title="Descendre">
+                                        <ChevronDown size={11} />
+                                    </button>
+                                </div>
                                 <button className="le-icon-btn" onClick={e => { e.stopPropagation(); setEditSection(id); }} title="Modifier la section">
                                     <Pencil size={11} />
                                 </button>
@@ -295,8 +328,8 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                                 onDragStart={e => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; }}
                                                 onDragEnd={() => { setDragKey(null); setDropTarget(null); setInsertInfo(null); }}
                                                 onDragOver={e => {
-                                                    if (!dragKey) return;
                                                     e.preventDefault();
+                                                    if (!dragKey) return;
                                                     e.stopPropagation();
                                                     e.dataTransfer.dropEffect = 'move';
                                                     const rect = e.currentTarget.getBoundingClientRect();
@@ -339,6 +372,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
             {dragSectionId && sectionDropIndex === sortedSections.length && (
                 <div className="le-section-drop-line" />
             )}
+            </div>
 
             <button className="le-add-section" onClick={() => setAddingSection(true)}>
                 <Plus size={14} />

@@ -866,6 +866,19 @@ body::before {
     cursor: grab;
 }
 .le-section-grip:active { cursor: grabbing; }
+.le-section-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+}
+.le-section-arrows .le-icon-btn {
+    padding: 1px 3px;
+}
+.le-section-arrows .le-icon-btn:disabled {
+    opacity: 0.2;
+    cursor: default;
+}
 .le-section-dragging { opacity: 0.35; }
 .le-section-drop-line {
     height: 3px;
