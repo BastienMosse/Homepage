@@ -6,7 +6,7 @@
     <title>Lucipher Lab · Homelab</title>
     <meta name="description" content="Lucipher Lab, un homelab auto-hébergé bâti comme les Neuf Mondes de la mythologie nordique.">
     <meta name="theme-color" content="#06060a">
-    <link rel="icon" href="/brand/icons/yggdrasil.svg" type="image/svg+xml">
+    <link rel="icon" href="/brand/icons/lucipher-lab.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -42,12 +42,7 @@
 
         /* ── Hero ── */
         .hero { min-height: 92vh; display: grid; place-items: center; text-align: center; padding: 64px 0 32px }
-        .hero-tree {
-            width: min(230px, 56vw); height: auto; display: block; margin: 0 auto 28px;
-            filter: drop-shadow(0 0 40px rgba(139,92,246,.35));
-            animation: breathe 6s ease-in-out infinite;
-        }
-        @keyframes breathe { 50% { filter: drop-shadow(0 0 64px rgba(139,92,246,.55)) } }
+        .hero-gate { width: min(460px, 88vw); height: auto; display: block; margin: 0 auto 18px }
         h1 {
             margin: 0; font-family: 'Oxanium', sans-serif; font-weight: 700;
             font-size: clamp(2.4rem, 8vw, 4.6rem); letter-spacing: .06em; line-height: 1.05;
@@ -128,7 +123,6 @@
         .reveal.in { opacity: 1; transform: none }
         @media (prefers-reduced-motion: reduce) {
             .reveal { opacity: 1; transform: none; transition: none }
-            .hero-tree { animation: none }
             html { scroll-behavior: auto }
         }
     </style>
@@ -138,10 +132,10 @@
 
 <header class="hero">
     <div class="wrap">
-        <img class="hero-tree" src="/brand/icons/yggdrasil.svg" alt="Yggdrasil, l'arbre-monde" width="230" height="230">
+        <img class="hero-gate" src="/brand/porte-des-7-royaumes.svg" alt="La Porte de Lucipher Lab, entourée des sept royaumes" width="460" height="460">
         <h1>LUCIPHER LAB</h1>
         <div class="mono">Homelab</div>
-        <p class="lead">Un homelab auto-hébergé, bâti comme les Neuf Mondes : chaque service est un royaume, et Yggdrasil les porte tous.</p>
+        <p class="lead">Un homelab auto-hébergé, bâti comme les mondes nordiques : chaque service est un royaume, et la Porte de Lucipher Lab ouvre sur les sept.</p>
         <div class="actions">
             <a class="btn btn-primary" href="#royaumes">Explorer les royaumes</a>
             <a class="btn btn-ghost" href="https://asgard.lucipher-lab.fr">Portail Asgard →</a>

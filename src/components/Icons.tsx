@@ -51,7 +51,7 @@ export const COLORS: Record<string, { bg: string; stroke: string; glow: string }
 export const COLOR_NAMES = Object.keys(COLORS);
 
 // Icônes de marque (SVG dans public/brand/icons/), référencées dans layout.json par « brand:<nom> »
-export const BRAND_ICONS = ['asgard', 'odin', 'heimdall', 'heimdall-2', 'bifrost', 'yggdrasil', 'hermod', 'draupnir'];
+export const BRAND_ICONS = ['asgard', 'odin', 'heimdall', 'lucipher-lab', 'bifrost', 'yggdrasil', 'hermod', 'draupnir'];
 
 export const isBrandIcon = (name?: string) => !!name && name.startsWith('brand:');
 
