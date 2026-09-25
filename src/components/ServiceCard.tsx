@@ -1,8 +1,8 @@
 import type { ServiceItem } from '../types.ts';
-import { getIcon, COLORS } from './Icons.tsx';
+import { COLORS, IconView, isBrandIcon } from './Icons.tsx';
 
 export default function ServiceCard({ item, onClick }: { item: ServiceItem; onClick?: () => void }) {
-    const Icon = getIcon(item.icon);
+    const brand = isBrandIcon(item.icon);
     const c = COLORS[item.color] || COLORS.purple;
 
     const content = (
@@ -11,8 +11,8 @@ export default function ServiceCard({ item, onClick }: { item: ServiceItem; onCl
             {item.state && item.state !== 'static' && item.state !== 'external' && (
                 <span className={`card-state-dot ${item.state === 'running' ? 'running' : 'stopped'}`} />
             )}
-            <div className="card-icon" style={{ background: c.bg }}>
-                <Icon size={20} color={c.stroke} strokeWidth={1.8} />
+            <div className={`card-icon${brand ? ' card-icon-brand' : ''}`} style={brand ? undefined : { background: c.bg }}>
+                <IconView name={item.icon} size={brand ? 42 : 20} color={c.stroke} strokeWidth={1.8} />
             </div>
             <div className="card-text">
                 <div className="card-name">{item.name}</div>

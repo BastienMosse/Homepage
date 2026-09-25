@@ -208,6 +208,7 @@ body::before {
     position: relative;
 }
 .card:hover .card-icon { transform: scale(1.08) }
+.card-icon-brand { border-radius: 50%; filter: drop-shadow(0 0 10px rgba(139,92,246,.25)) }
 
 .card-text { position: relative; min-width: 0 }
 .card-name {
@@ -1060,6 +1061,7 @@ body::before {
     cursor: pointer;
     transition: all .15s ease;
 }
+.le-icon-option-brand { padding: 0 }
 .le-icon-option:hover {
     background: var(--surface-hover);
     color: var(--text);

@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from 'react';
-import { getIcon, COLORS, ICON_NAMES, COLOR_NAMES } from './Icons.tsx';
+import { getIcon, COLORS, ICON_NAMES, COLOR_NAMES, BRAND_ICONS, IconView, isBrandIcon } from './Icons.tsx';
 import { ArrowLeft, Pencil, GripVertical, Plus, EyeOff, Save, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface LayoutSection { label: string; icon: string; order: number; adminOnly?: boolean; hidden?: boolean; }
@@ -285,7 +285,6 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                             </div>
                             <div className="le-cards">
                                 {items.map(([key, svc], idx) => {
-                                    const SIcon = getIcon(svc.icon);
                                     const c = COLORS[svc.color] || COLORS.purple;
                                     const state = liveState[key];
                                     const showBefore = dragKey && dragKey !== key && insertInfo?.sectionId === id && insertInfo.index === idx;
@@ -308,8 +307,8 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                                 }}
                                             >
                                                 <div className="le-card-grip"><GripVertical size={14} /></div>
-                                                <div className="le-card-icon" style={{ background: c.bg }}>
-                                                    <SIcon size={16} color={c.stroke} strokeWidth={1.8} />
+                                                <div className="le-card-icon" style={isBrandIcon(svc.icon) ? undefined : { background: c.bg }}>
+                                                    <IconView name={svc.icon} size={isBrandIcon(svc.icon) ? 32 : 16} color={c.stroke} strokeWidth={1.8} />
                                                 </div>
                                                 <div className="le-card-info">
                                                     <div className="le-card-name">{svc.name}</div>
@@ -403,6 +402,16 @@ function CardEditModal({ svc, onSave, onDelete, onClose }: {
 
                 <label className="le-label">Ic&ocirc;ne</label>
                 <div className="le-icon-picker">
+                    {BRAND_ICONS.map(b => `brand:${b}`).map(name => (
+                        <button
+                            key={name}
+                            className={`le-icon-option le-icon-option-brand ${form.icon === name ? 'active' : ''}`}
+                            onClick={() => setForm({ ...form, icon: name })}
+                            title={name.slice(6)}
+                        >
+                            <IconView name={name} size={26} />
+                        </button>
+                    ))}
                     {ICON_NAMES.map(name => {
                         const I = getIcon(name);
                         return (
@@ -473,6 +482,16 @@ function SectionEditModal({ section, id, onSave, onDelete, onClose }: {
 
                 <label className="le-label">Ic&ocirc;ne</label>
                 <div className="le-icon-picker">
+                    {BRAND_ICONS.map(b => `brand:${b}`).map(name => (
+                        <button
+                            key={name}
+                            className={`le-icon-option le-icon-option-brand ${form.icon === name ? 'active' : ''}`}
+                            onClick={() => setForm({ ...form, icon: name })}
+                            title={name.slice(6)}
+                        >
+                            <IconView name={name} size={26} />
+                        </button>
+                    ))}
                     {ICON_NAMES.map(name => {
                         const I = getIcon(name);
                         return (
