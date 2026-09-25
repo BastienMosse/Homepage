@@ -257,6 +257,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                             }}
                             onDrop={e => {
                                 e.preventDefault();
+                                e.stopPropagation();
                                 if (dragSectionId) {
                                     const rect = e.currentTarget.getBoundingClientRect();
                                     const dropIdx = e.clientY < rect.top + rect.height / 2 ? sectionIdx : sectionIdx + 1;
