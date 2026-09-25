@@ -20,6 +20,8 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
     const [dragKey, setDragKey] = useState<string | null>(null);
     const [dropTarget, setDropTarget] = useState<string | null>(null);
     const [insertInfo, setInsertInfo] = useState<{sectionId: string; index: number} | null>(null);
+    const [dragSectionId, setDragSectionId] = useState<string | null>(null);
+    const [sectionDropIndex, setSectionDropIndex] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
 
@@ -115,6 +117,29 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
         setInsertInfo(null);
     }
 
+    function handleSectionDrop(targetIndex: number) {
+        if (!dragSectionId || !layout) return;
+
+        const sorted = Object.entries(layout.sections)
+            .sort(([, a], [, b]) => (a.order ?? 99) - (b.order ?? 99));
+
+        const fromIndex = sorted.findIndex(([id]) => id === dragSectionId);
+        if (fromIndex < 0 || fromIndex === targetIndex) return;
+
+        const item = sorted.splice(fromIndex, 1)[0];
+        const adjustedTarget = fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
+        sorted.splice(adjustedTarget, 0, item);
+
+        const newSections = { ...layout.sections };
+        sorted.forEach(([id], i) => {
+            newSections[id] = { ...newSections[id], order: i };
+        });
+
+        setLayout({ ...layout, sections: newSections });
+        setDragSectionId(null);
+        setSectionDropIndex(null);
+    }
+
     async function handleSave() {
         if (!layout) return;
         setSaving(true);
@@ -174,108 +199,146 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                 </div>
             </div>
 
-            {sortedSections.map(([id, def]) => {
+            {sortedSections.map(([id, def], sectionIdx) => {
                 const SectionIcon = getIcon(def.icon);
                 const items = sectionItems(id);
                 const statics = sectionStaticItems(id);
+                const showSectionDropBefore = dragSectionId && dragSectionId !== id && sectionDropIndex === sectionIdx;
 
                 return (
-                    <div
-                        key={id}
-                        className={`le-section ${dropTarget === id ? 'le-drop-target' : ''} ${def.hidden ? 'le-section-hidden' : ''}`}
-                        onDragOver={e => {
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = 'move';
-                            setDropTarget(id);
-                            setInsertInfo({ sectionId: id, index: items.length });
-                        }}
-                        onDragLeave={e => {
-                            if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
-                                setDropTarget(null);
-                                setInsertInfo(null);
-                            }
-                        }}
-                        onDrop={e => { e.preventDefault(); handleDrop(id); }}
-                    >
-                        <div className="le-section-header">
-                            <SectionIcon size={14} />
-                            <span>{def.label}</span>
-                            {def.adminOnly && <span className="le-badge">admin</span>}
-                            {def.hidden && <span className="le-badge le-badge-dim">masqu&eacute;</span>}
-                            <button className="le-icon-btn" onClick={() => setEditSection(id)} title="Modifier la section">
-                                <Pencil size={11} />
-                            </button>
-                        </div>
-                        <div className="le-cards">
-                            {statics.map((s, i) => {
-                                const SIcon = getIcon(s.icon);
-                                const c = COLORS[s.color] || COLORS.purple;
-                                return (
-                                    <div key={`s-${i}`} className="le-card le-card-static">
-                                        <div className="le-card-grip"><GripVertical size={14} /></div>
-                                        <div className="le-card-icon" style={{ background: c.bg }}>
-                                            <SIcon size={16} color={c.stroke} strokeWidth={1.8} />
-                                        </div>
-                                        <div className="le-card-info">
-                                            <div className="le-card-name">{s.name}</div>
-                                            <div className="le-card-desc">{s.desc}</div>
-                                        </div>
-                                        <span className="le-badge le-badge-dim">statique</span>
-                                    </div>
-                                );
-                            })}
-                            {items.map(([key, svc], idx) => {
-                                const SIcon = getIcon(svc.icon);
-                                const c = COLORS[svc.color] || COLORS.purple;
-                                const state = liveState[key];
-                                const showBefore = dragKey && dragKey !== key && insertInfo?.sectionId === id && insertInfo.index === idx;
-                                return (
-                                    <Fragment key={key}>
-                                        {showBefore && <div className="le-drop-line" />}
-                                        <div
-                                            className={`le-card ${svc.hidden ? 'le-card-hidden' : ''} ${dragKey === key ? 'le-card-dragging' : ''}`}
-                                            draggable
-                                            onDragStart={e => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; }}
-                                            onDragEnd={() => { setDragKey(null); setDropTarget(null); setInsertInfo(null); }}
-                                            onDragOver={e => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                e.dataTransfer.dropEffect = 'move';
-                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                setInsertInfo({ sectionId: id, index: e.clientY < rect.top + rect.height / 2 ? idx : idx + 1 });
-                                                setDropTarget(id);
-                                            }}
-                                        >
+                    <Fragment key={id}>
+                        {showSectionDropBefore && <div className="le-section-drop-line" />}
+                        <div
+                            className={`le-section ${dropTarget === id ? 'le-drop-target' : ''} ${def.hidden ? 'le-section-hidden' : ''} ${dragSectionId === id ? 'le-section-dragging' : ''}`}
+                            onDragOver={e => {
+                                e.preventDefault();
+                                if (dragSectionId) {
+                                    e.dataTransfer.dropEffect = 'move';
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setSectionDropIndex(e.clientY < rect.top + rect.height / 2 ? sectionIdx : sectionIdx + 1);
+                                } else if (dragKey) {
+                                    e.dataTransfer.dropEffect = 'move';
+                                    setDropTarget(id);
+                                    setInsertInfo({ sectionId: id, index: items.length });
+                                }
+                            }}
+                            onDragLeave={e => {
+                                if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+                                    if (!dragSectionId) {
+                                        setDropTarget(null);
+                                        setInsertInfo(null);
+                                    }
+                                }
+                            }}
+                            onDrop={e => {
+                                e.preventDefault();
+                                if (dragSectionId) {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const dropIdx = e.clientY < rect.top + rect.height / 2 ? sectionIdx : sectionIdx + 1;
+                                    handleSectionDrop(dropIdx);
+                                } else {
+                                    handleDrop(id);
+                                }
+                            }}
+                        >
+                            <div
+                                className="le-section-header"
+                                draggable
+                                onDragStart={e => {
+                                    setDragSectionId(id);
+                                    e.dataTransfer.effectAllowed = 'move';
+                                }}
+                                onDragEnd={() => {
+                                    setDragSectionId(null);
+                                    setSectionDropIndex(null);
+                                }}
+                            >
+                                <div className="le-section-grip"><GripVertical size={14} /></div>
+                                <SectionIcon size={14} />
+                                <span>{def.label}</span>
+                                {def.adminOnly && <span className="le-badge">admin</span>}
+                                {def.hidden && <span className="le-badge le-badge-dim">masqu&eacute;</span>}
+                                <button className="le-icon-btn" onClick={e => { e.stopPropagation(); setEditSection(id); }} title="Modifier la section">
+                                    <Pencil size={11} />
+                                </button>
+                            </div>
+                            <div className="le-cards">
+                                {statics.map((s, i) => {
+                                    const SIcon = getIcon(s.icon);
+                                    const c = COLORS[s.color] || COLORS.purple;
+                                    return (
+                                        <div key={`s-${i}`} className="le-card le-card-static">
                                             <div className="le-card-grip"><GripVertical size={14} /></div>
                                             <div className="le-card-icon" style={{ background: c.bg }}>
                                                 <SIcon size={16} color={c.stroke} strokeWidth={1.8} />
                                             </div>
                                             <div className="le-card-info">
-                                                <div className="le-card-name">{svc.name}</div>
-                                                <div className="le-card-desc">{svc.desc || key}</div>
+                                                <div className="le-card-name">{s.name}</div>
+                                                <div className="le-card-desc">{s.desc}</div>
                                             </div>
-                                            {state && (
-                                                <span className={`card-state-dot ${state === 'running' ? 'running' : 'stopped'}`}
-                                                    style={{ position: 'static', flexShrink: 0 }} />
-                                            )}
-                                            {svc.hidden && <EyeOff size={12} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
-                                            <button className="le-icon-btn" onClick={() => setEditCard(key)} title="Modifier">
-                                                <Pencil size={11} />
-                                            </button>
+                                            <span className="le-badge le-badge-dim">statique</span>
                                         </div>
-                                    </Fragment>
-                                );
-                            })}
-                            {dragKey && insertInfo?.sectionId === id && insertInfo.index === items.length && (
-                                <div className="le-drop-line" />
-                            )}
-                            {items.length === 0 && statics.length === 0 && !dragKey && (
-                                <div className="le-empty">Glisser des cartes ici</div>
-                            )}
+                                    );
+                                })}
+                                {items.map(([key, svc], idx) => {
+                                    const SIcon = getIcon(svc.icon);
+                                    const c = COLORS[svc.color] || COLORS.purple;
+                                    const state = liveState[key];
+                                    const showBefore = dragKey && dragKey !== key && insertInfo?.sectionId === id && insertInfo.index === idx;
+                                    return (
+                                        <Fragment key={key}>
+                                            {showBefore && <div className="le-drop-line" />}
+                                            <div
+                                                className={`le-card ${svc.hidden ? 'le-card-hidden' : ''} ${dragKey === key ? 'le-card-dragging' : ''}`}
+                                                draggable
+                                                onDragStart={e => { setDragKey(key); e.dataTransfer.effectAllowed = 'move'; }}
+                                                onDragEnd={() => { setDragKey(null); setDropTarget(null); setInsertInfo(null); }}
+                                                onDragOver={e => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (dragKey) {
+                                                        e.dataTransfer.dropEffect = 'move';
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        setInsertInfo({ sectionId: id, index: e.clientY < rect.top + rect.height / 2 ? idx : idx + 1 });
+                                                        setDropTarget(id);
+                                                    }
+                                                }}
+                                            >
+                                                <div className="le-card-grip"><GripVertical size={14} /></div>
+                                                <div className="le-card-icon" style={{ background: c.bg }}>
+                                                    <SIcon size={16} color={c.stroke} strokeWidth={1.8} />
+                                                </div>
+                                                <div className="le-card-info">
+                                                    <div className="le-card-name">{svc.name}</div>
+                                                    <div className="le-card-desc">{svc.desc || key}</div>
+                                                </div>
+                                                {state && (
+                                                    <span className={`card-state-dot ${state === 'running' ? 'running' : 'stopped'}`}
+                                                        style={{ position: 'static', flexShrink: 0 }} />
+                                                )}
+                                                {svc.hidden && <EyeOff size={12} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
+                                                <button className="le-icon-btn" onClick={() => setEditCard(key)} title="Modifier">
+                                                    <Pencil size={11} />
+                                                </button>
+                                            </div>
+                                        </Fragment>
+                                    );
+                                })}
+                                {dragKey && insertInfo?.sectionId === id && insertInfo.index === items.length && (
+                                    <div className="le-drop-line" />
+                                )}
+                                {items.length === 0 && statics.length === 0 && !dragKey && (
+                                    <div className="le-empty">Glisser des cartes ici</div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    </Fragment>
                 );
             })}
+
+            {dragSectionId && sectionDropIndex === sortedSections.length && (
+                <div className="le-section-drop-line" />
+            )}
 
             <button className="le-add-section" onClick={() => setAddingSection(true)}>
                 <Plus size={14} />
@@ -420,10 +483,6 @@ function SectionEditModal({ section, id, onSave, onDelete, onClose }: {
                         );
                     })}
                 </div>
-
-                <label className="le-label">Ordre</label>
-                <input type="number" value={form.order ?? 0}
-                    onChange={e => setForm({ ...form, order: parseInt(e.target.value) || 0 })} />
 
                 <label className="le-checkbox">
                     <input type="checkbox" checked={!!form.adminOnly} onChange={e => setForm({ ...form, adminOnly: e.target.checked })} />

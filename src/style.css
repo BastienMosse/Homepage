@@ -128,6 +128,14 @@ body::before {
     width: 14px; height: 14px;
     opacity: .5;
 }
+.section-chevron {
+    margin-left: auto;
+    transition: transform .25s ease;
+    opacity: .3;
+}
+.section-header:hover .section-chevron { opacity: .6; }
+.section-chevron.rotated { transform: rotate(-90deg); }
+.section-collapsed .cards { display: none; }
 .section-link {
     background: none;
     border: none;
@@ -840,13 +848,31 @@ body::before {
     text-transform: uppercase;
     letter-spacing: .1em;
     color: var(--text-dim);
+    cursor: grab;
+    user-select: none;
 }
+.le-section-header:active { cursor: grabbing; }
 .le-section-header svg { opacity: .5; flex-shrink: 0; }
 .le-section-header::after {
     content: '';
     flex: 1;
     height: 1px;
     background: var(--border);
+}
+.le-section-grip {
+    color: var(--text-dim);
+    flex-shrink: 0;
+    opacity: .4;
+    cursor: grab;
+}
+.le-section-grip:active { cursor: grabbing; }
+.le-section-dragging { opacity: 0.35; }
+.le-section-drop-line {
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    margin: 4px 0;
+    box-shadow: 0 0 10px rgba(124,108,240,0.5);
 }
 .le-badge {
     font-size: .58rem;
