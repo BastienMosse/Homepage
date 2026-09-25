@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucipher Lab · Homelab</title>
+    <meta name="description" content="Lucipher Lab, un homelab auto-hébergé bâti comme les Neuf Mondes de la mythologie nordique.">
+    <meta name="theme-color" content="#06060a">
+    <link rel="icon" href="/brand/icons/yggdrasil.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #06060a;
+            --surface: #0e0e18;
+            --border: #1e1e3a;
+            --text: #e2e8f0;
+            --muted: #8f86a8;
+            --lilac: #c8a2ff;
+            --violet: #8b5cf6;
+            --deep: #6d28d9;
+            --ease: cubic-bezier(.2, .7, .2, 1);
+        }
+        * { box-sizing: border-box }
+        html { scroll-behavior: smooth }
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        a { color: inherit }
+        .glow {
+            position: fixed; inset: -20% -10% auto; height: 70vh; z-index: -1; pointer-events: none;
+            background: radial-gradient(ellipse at 50% 30%, rgba(139,92,246,.16), transparent 60%);
+        }
+        .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px }
+        .mono { font-family: 'JetBrains Mono', monospace; letter-spacing: .22em; text-transform: uppercase; font-size: .72rem; color: var(--muted) }
+
+        /* ── Hero ── */
+        .hero { min-height: 92vh; display: grid; place-items: center; text-align: center; padding: 64px 0 32px }
+        .hero-tree {
+            width: min(230px, 56vw); height: auto; display: block; margin: 0 auto 28px;
+            filter: drop-shadow(0 0 40px rgba(139,92,246,.35));
+            animation: breathe 6s ease-in-out infinite;
+        }
+        @keyframes breathe { 50% { filter: drop-shadow(0 0 64px rgba(139,92,246,.55)) } }
+        h1 {
+            margin: 0; font-family: 'Oxanium', sans-serif; font-weight: 700;
+            font-size: clamp(2.4rem, 8vw, 4.6rem); letter-spacing: .06em; line-height: 1.05;
+            background: linear-gradient(135deg, #f1ecff 20%, var(--lilac) 60%, var(--violet));
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .hero .mono { margin-top: 10px; font-size: .8rem; letter-spacing: .5em }
+        .lead { max-width: 560px; margin: 26px auto 0; color: var(--muted); font-size: 1.05rem }
+        .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 34px }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 10px;
+            font-weight: 600; font-size: .92rem; text-decoration: none; transition: all .25s var(--ease);
+        }
+        .btn-primary { background: linear-gradient(135deg, var(--violet), var(--deep)); color: #fff; box-shadow: 0 8px 30px rgba(109,40,217,.35) }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 38px rgba(109,40,217,.5) }
+        .btn-ghost { border: 1px solid var(--border); color: var(--text) }
+        .btn-ghost:hover { border-color: var(--violet); background: rgba(139,92,246,.08) }
+
+        /* ── Sections ── */
+        section { padding: 72px 0 }
+        .head { text-align: center; margin-bottom: 44px }
+        h2 { margin: 8px 0 10px; font-family: 'Oxanium', sans-serif; font-size: clamp(1.7rem, 4.5vw, 2.4rem); letter-spacing: .03em }
+        .head p { margin: 0 auto; max-width: 560px; color: var(--muted) }
+
+        /* ── Royaumes ── */
+        .realms { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 16px }
+        .realm {
+            position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 18px;
+            padding: 28px 24px 24px; text-align: center; overflow: hidden;
+            transition: transform .35s var(--ease), border-color .35s var(--ease);
+        }
+        .realm::before {
+            content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity .35s var(--ease);
+            background: radial-gradient(circle at 50% 25%, rgba(139,92,246,.18), transparent 65%);
+        }
+        .realm:hover { transform: translateY(-4px); border-color: rgba(139,92,246,.45) }
+        .realm:hover::before { opacity: 1 }
+        .realm img {
+            position: relative; width: 132px; height: 132px; display: block; margin: 0 auto 18px;
+            transition: transform .5s var(--ease), filter .5s var(--ease);
+        }
+        .realm:hover img { transform: scale(1.06) rotate(-2deg); filter: drop-shadow(0 0 22px rgba(139,92,246,.45)) }
+        .realm h3 { position: relative; margin: 0; font-family: 'Oxanium', sans-serif; font-size: 1.35rem; letter-spacing: .06em }
+        .realm .mono { position: relative; display: block; margin-top: 2px; color: var(--lilac); letter-spacing: .18em; font-size: .66rem }
+        .realm p { position: relative; margin: 12px 0 18px; color: var(--muted); font-size: .92rem }
+        .badge {
+            position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+            font-family: 'JetBrains Mono', monospace; font-size: .7rem; letter-spacing: .08em; text-decoration: none;
+        }
+        .badge-open { background: rgba(139,92,246,.14); color: var(--lilac); border: 1px solid rgba(139,92,246,.35) }
+        .badge-open:hover { background: rgba(139,92,246,.26) }
+        .badge-locked { color: var(--muted); border: 1px dashed var(--border) }
+        .badge svg { width: 12px; height: 12px }
+
+        /* ── Midgard ── */
+        .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px }
+        .tool {
+            display: block; padding: 20px 22px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border);
+            text-decoration: none; transition: all .3s var(--ease);
+        }
+        .tool:hover { border-color: rgba(139,92,246,.45); transform: translateY(-3px) }
+        .tool b { display: flex; justify-content: space-between; font-size: 1rem }
+        .tool b span { color: var(--violet); transition: transform .3s var(--ease) }
+        .tool:hover b span { transform: translateX(4px) }
+        .tool small { display: block; margin-top: 4px; color: var(--muted); font-size: .85rem }
+
+        /* ── Contact / pied ── */
+        .contact { text-align: center }
+        .contact a.mail {
+            display: inline-block; margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: clamp(1rem, 3.5vw, 1.35rem);
+            color: var(--lilac); text-decoration: none; border-bottom: 1px solid rgba(200,162,255,.35); padding-bottom: 2px;
+        }
+        .contact a.mail:hover { border-color: var(--lilac) }
+        footer { border-top: 1px solid var(--border); padding: 26px 0 34px; text-align: center }
+        footer a { color: var(--muted); text-decoration: none } footer a:hover { color: var(--lilac) }
+
+        .reveal { opacity: 0; transform: translateY(18px); transition: opacity .8s var(--ease), transform .8s var(--ease) }
+        .reveal.in { opacity: 1; transform: none }
+        @media (prefers-reduced-motion: reduce) {
+            .reveal { opacity: 1; transform: none; transition: none }
+            .hero-tree { animation: none }
+            html { scroll-behavior: auto }
+        }
+    </style>
+</head>
+<body>
+<div class="glow"></div>
+
+<header class="hero">
+    <div class="wrap">
+        <img class="hero-tree" src="/brand/icons/yggdrasil.svg" alt="Yggdrasil, l'arbre-monde" width="230" height="230">
+        <h1>LUCIPHER LAB</h1>
+        <div class="mono">Homelab</div>
+        <p class="lead">Un homelab auto-hébergé, bâti comme les Neuf Mondes : chaque service est un royaume, et Yggdrasil les porte tous.</p>
+        <div class="actions">
+            <a class="btn btn-primary" href="#royaumes">Explorer les royaumes</a>
+            <a class="btn btn-ghost" href="https://asgard.lucipher-lab.fr">Portail Asgard →</a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section id="royaumes">
+        <div class="wrap">
+            <div class="head reveal">
+                <div class="mono">Les royaumes</div>
+                <h2>L'infrastructure</h2>
+                <p>Les dieux et leurs attributs veillent sur le lab. Certains royaumes restent fermés aux mortels.</p>
+            </div>
+            <div class="realms">
+                <article class="realm reveal">
+                    <img src="/brand/icons/asgard.svg" alt="" width="132" height="132">
+                    <h3>Asgard</h3><span class="mono">Le portail</span>
+                    <p>La cité des dieux : le tableau de bord qui veille sur chaque service du lab.</p>
+                    <a class="badge badge-open" href="https://asgard.lucipher-lab.fr">Entrer →</a>
+                </article>
+                <article class="realm reveal">
+                    <img src="/brand/icons/yggdrasil.svg" alt="" width="132" height="132">
+                    <h3>Yggdrasil</h3><span class="mono">Les fichiers</span>
+                    <p>L'arbre-monde, dont les racines et les branches portent tous les fichiers partagés.</p>
+                    <a class="badge badge-open" href="https://yggdrasil.lucipher-lab.fr">Ouvrir →</a>
+                </article>
+                <article class="realm reveal">
+                    <img src="/brand/icons/hermod.svg" alt="" width="132" height="132">
+                    <h3>Hermod</h3><span class="mono">Le courrier</span>
+                    <p>Le messager des dieux, monté sur Sleipnir : la messagerie @lucipher-lab.fr.</p>
+                    <span class="badge badge-locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Réservé</span>
+                </article>
+                <article class="realm reveal">
+                    <img src="/brand/icons/draupnir.svg" alt="" width="132" height="132">
+                    <h3>Draupnir</h3><span class="mono">Le coffre</span>
+                    <p>L'anneau d'Odin, qui engendre ses semblables : ici, il garde les secrets.</p>
+                    <span class="badge badge-locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Réservé</span>
+                </article>
+                <article class="realm reveal">
+                    <img src="/brand/icons/odin.svg" alt="" width="132" height="132">
+                    <h3>Odin</h3><span class="mono">L'orchestrateur</span>
+                    <p>Le Père-de-tout, qui a donné un œil pour tout voir : il déploie chaque service.</p>
+                    <span class="badge badge-locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Réservé</span>
+                </article>
+                <article class="realm reveal">
+                    <img src="/brand/icons/heimdall.svg" alt="" width="132" height="132">
+                    <h3>Heimdall</h3><span class="mono">Le gardien</span>
+                    <p>Il voit et entend tout, et garde le seul chemin vers les royaumes privés.</p>
+                    <span class="badge badge-locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Réservé</span>
+                </article>
+                <article class="realm reveal">
+                    <img src="/brand/icons/bifrost.svg" alt="" width="132" height="132">
+                    <h3>Bifrost</h3><span class="mono">Le pont</span>
+                    <p>Le pont arc-en-ciel entre les mondes : tout le trafic du lab le traverse.</p>
+                    <span class="badge badge-locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Réservé</span>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section id="midgard">
+        <div class="wrap">
+            <div class="head reveal">
+                <div class="mono">Midgard</div>
+                <h2>Les outils ouverts</h2>
+                <p>Le monde des humains : ce que le lab met à disposition de tous.</p>
+            </div>
+            <div class="tools">
+                <a class="tool reveal" href="https://whisper.lucipher-lab.fr"><b>Whisper <span>→</span></b><small>Partager un secret qui s'efface après lecture.</small></a>
+                <a class="tool reveal" href="https://relais.lucipher-lab.fr"><b>Relais <span>→</span></b><small>Messagerie chiffrée de bout en bout.</small></a>
+                <a class="tool reveal" href="https://network-learning.lucipher-lab.fr"><b>Network Learning <span>→</span></b><small>Des cours de réseau interactifs.</small></a>
+                <a class="tool reveal" href="https://cyber.lucipher-lab.fr"><b>Cyber Dashboard <span>→</span></b><small>Veille cybersécurité et globe des menaces en 3D.</small></a>
+            </div>
+        </div>
+    </section>
+
+    <section class="contact">
+        <div class="wrap reveal">
+            <div class="mono">Contact</div>
+            <h2>Un message pour les dieux ?</h2>
+            <a class="mail" href="mailto:contact@lucipher-lab.fr">contact@lucipher-lab.fr</a>
+        </div>
+    </section>
+</main>
+
+<footer>
+    <div class="wrap mono"><a href="https://lucipher-lab.fr">Lucipher Lab</a> · Homelab · <a href="https://asgard.lucipher-lab.fr">Asgard</a></div>
+</footer>
+
+<script>
+    // Apparition douce des blocs au défilement
+    const io = new IntersectionObserver(entries => {
+        for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>

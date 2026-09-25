@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DIST_DIR = path.join(__dirname, '..', 'dist');
+const VITRINE_HOSTS = (process.env.VITRINE_HOSTS || 'lucipher-lab.fr').split(',').map(h => h.trim().toLowerCase());
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const PROC_DIR = process.env.PROC_DIR || '/host/proc';
 const LAYOUT_FILE = process.env.LAYOUT_FILE || path.join(DATA_DIR, 'layout.json');
@@ -561,14 +562,17 @@ const server = http.createServer(async (req, res) => {
 
     // --- Static files ---
 
-    let filePath = path.join(DIST_DIR, url === '/' ? 'index.html' : url);
+    // lucipher-lab.fr sert la vitrine publique, les autres domaines (asgard.) le portail
+    const host = (req.headers.host || '').split(':')[0].toLowerCase();
+    const indexFile = VITRINE_HOSTS.includes(host) ? 'vitrine.html' : 'index.html';
+    let filePath = path.join(DIST_DIR, url === '/' ? indexFile : url);
     if (!filePath.startsWith(path.resolve(DIST_DIR))) {
         res.writeHead(403); res.end('Forbidden'); return;
     }
 
     fs.readFile(filePath, (err, data) => {
         if (err) {
-            fs.readFile(path.join(DIST_DIR, 'index.html'), (e, html) => {
+            fs.readFile(path.join(DIST_DIR, indexFile), (e, html) => {
                 if (e) { res.writeHead(404); res.end('Not found'); return; }
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
                 res.end(html);
