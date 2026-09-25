@@ -247,6 +247,7 @@ export default function LayoutEditor({ onBack }: { onBack: () => void }) {
                                 onDragStart={e => {
                                     setDragSectionId(id);
                                     e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('text/plain', id);
                                 }}
                                 onDragEnd={() => {
                                     setDragSectionId(null);
