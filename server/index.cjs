@@ -663,7 +663,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     // Zip de dossier Yggdrasil (bouton injecté dans OpenList, route Traefik ygg-zip.yaml)
-    if (url === '/ygg-zip' && req.method === 'POST') {
+    if (url === '/ygg-zip') {
+        if (req.method !== 'POST') {
+            // « Réessayer » depuis la liste des téléchargements du navigateur refait un GET sans formulaire :
+            // on répond une erreur claire plutôt que la page d'Asgard (qui serait enregistrée comme « ygg-zip »)
+            res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8', Allow: 'POST' });
+            res.end('Relance le zip depuis Yggdrasil (menu Télécharger en zip).');
+            return;
+        }
         const form = Object.fromEntries(new URLSearchParams(await parseBody(req, 262144)));
         await handleZip(req, res, { form, resolveBase: resolveYggBase });
         return;
