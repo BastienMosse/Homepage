@@ -59,6 +59,28 @@ function isAuthed(req) {
     return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected));
 }
 
+// Anti-bruteforce : 5 échecs par IP → blocage 15 min (Traefik fournit X-Forwarded-For)
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_BLOCK_MS = 15 * 60 * 1000;
+const loginAttempts = new Map();
+
+function clientIp(req) {
+    return (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '';
+}
+
+function loginBlockedFor(ip) {
+    const a = loginAttempts.get(ip);
+    if (!a) return 0;
+    if (Date.now() - a.first > LOGIN_BLOCK_MS) { loginAttempts.delete(ip); return 0; }
+    return a.fails >= LOGIN_MAX_FAILS ? Math.ceil((a.first + LOGIN_BLOCK_MS - Date.now()) / 1000) : 0;
+}
+
+function loginFailed(ip) {
+    const a = loginAttempts.get(ip);
+    if (!a || Date.now() - a.first > LOGIN_BLOCK_MS) loginAttempts.set(ip, { fails: 1, first: Date.now() });
+    else a.fails++;
+}
+
 function parseBody(req, maxSize) {
     if (!maxSize) maxSize = 4096;
     return new Promise(resolve => {
@@ -394,6 +416,7 @@ const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
 
     if (url === '/api/config') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         const { sections } = await discover();
         const filtered = sections
             .filter(s => !s.adminOnly && !s.hidden)
@@ -409,6 +432,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url === '/api/auth/login' && req.method === 'POST') {
+        const ip = clientIp(req);
+        const wait = loginBlockedFor(ip);
+        if (wait) return json(res, 429, { error: 'too_many_attempts', retryIn: wait });
         const body = await parseBody(req);
         let password;
         try { password = JSON.parse(body).password; } catch { password = ''; }
@@ -418,7 +444,8 @@ const server = http.createServer(async (req, res) => {
             crypto.createHash('sha256').update(password).digest(),
             crypto.createHash('sha256').update(ADMIN_TOKEN).digest(),
         );
-        if (!match) return json(res, 401, { error: 'unauthorized' });
+        if (!match) { loginFailed(ip); return json(res, 401, { error: 'unauthorized' }); }
+        loginAttempts.delete(ip);
 
         res.writeHead(200, {
             'Content-Type': 'application/json',

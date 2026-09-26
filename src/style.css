@@ -1422,3 +1422,8 @@ body::before {
     .bm-card-desc { width: 100%; }
     .container-modal { max-width: calc(100vw - 32px); }
 }
+
+/* --- Écran de verrouillage (Asgard sans session) --- */
+.lock-screen { background: transparent; backdrop-filter: none; }
+.lock-screen .modal { text-align: center; }
+.lock-mark { display: block; margin: 0 auto 12px; filter: drop-shadow(0 0 20px rgba(139,92,246,.35)); }

@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 
 interface Props {
     onSuccess: () => void;
-    onClose: () => void;
+    // Absent = écran de verrouillage (Asgard est entièrement protégé)
+    onClose?: () => void;
 }
 
 export default function LoginModal({ onSuccess, onClose }: Props) {
@@ -24,7 +25,10 @@ export default function LoginModal({ onSuccess, onClose }: Props) {
                 body: JSON.stringify({ password }),
             });
             if (res.ok) onSuccess();
-            else setError('Mot de passe incorrect');
+            else if (res.status === 429) {
+                const d = await res.json().catch(() => ({}));
+                setError(`Trop d'essais, réessaie dans ${Math.ceil((d.retryIn || 900) / 60)} min`);
+            } else setError('Mot de passe incorrect');
         } catch {
             setError('Erreur de connexion');
         }
@@ -32,9 +36,10 @@ export default function LoginModal({ onSuccess, onClose }: Props) {
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className={`modal-overlay ${onClose ? '' : 'lock-screen'}`} onClick={onClose}>
             <form className="modal" onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
-                <h3>Administration</h3>
+                {!onClose && <img className="lock-mark" src="/brand/icons/asgard.svg" alt="" width={64} height={64} />}
+                <h3>{onClose ? 'Administration' : 'Asgard'}</h3>
                 <div className="modal-error">{error}</div>
                 <input
                     ref={inputRef}
@@ -44,7 +49,7 @@ export default function LoginModal({ onSuccess, onClose }: Props) {
                     onChange={e => setPassword(e.target.value)}
                 />
                 <div className="modal-buttons">
-                    <button type="button" className="btn btn-ghost" onClick={onClose}>Annuler</button>
+                    {onClose && <button type="button" className="btn btn-ghost" onClick={onClose}>Annuler</button>}
                     <button type="submit" className="btn btn-primary" disabled={loading}>
                         {loading ? '...' : 'Connexion'}
                     </button>
