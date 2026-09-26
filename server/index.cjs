@@ -2,6 +2,7 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { DEFAULT_VITRINE, normalizeVitrine, renderVitrine } = require('./vitrine.cjs');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
@@ -11,6 +12,8 @@ const VITRINE_HOSTS = (process.env.VITRINE_HOSTS || 'lucipher-lab.fr').split(','
 const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const PROC_DIR = process.env.PROC_DIR || '/host/proc';
 const LAYOUT_FILE = process.env.LAYOUT_FILE || path.join(DATA_DIR, 'layout.json');
+// À côté de layout.json (/app/runtime en prod) pour survivre aux redeploys
+const VITRINE_FILE = process.env.VITRINE_FILE || path.join(path.dirname(LAYOUT_FILE), 'vitrine.json');
 
 const COOKIE_NAME = 'lab_admin';
 const COOKIE_MAX_AGE = 86400 * 7;
@@ -116,6 +119,37 @@ function saveLayout(layout) {
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(LAYOUT_FILE, JSON.stringify(layout, null, 2));
     } catch (e) { console.error('Failed to save layout:', e.message); }
+}
+
+// --- Vitrine persistence ---
+
+let vitrineCache = null;
+
+function loadVitrine() {
+    if (vitrineCache) return vitrineCache;
+    try { vitrineCache = normalizeVitrine(JSON.parse(fs.readFileSync(VITRINE_FILE, 'utf8'))); }
+    catch { vitrineCache = normalizeVitrine(DEFAULT_VITRINE); }
+    return vitrineCache;
+}
+
+function saveVitrine(data) {
+    vitrineCache = normalizeVitrine(data);
+    const dir = path.dirname(VITRINE_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(VITRINE_FILE, JSON.stringify(vitrineCache, null, 2));
+    return vitrineCache;
+}
+
+// --- Health check (onglet Serveur) ---
+
+async function probe(url) {
+    const t0 = Date.now();
+    try {
+        const r = await fetch(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(6000) });
+        return { status: r.status, ms: Date.now() - t0 };
+    } catch (e) {
+        return { status: 0, ms: Date.now() - t0, error: e.name === 'TimeoutError' ? 'timeout' : (e.cause?.code || e.message) };
+    }
 }
 
 // --- Docker ---
@@ -456,6 +490,46 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if (url === '/api/admin/vitrine' && req.method === 'GET') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        json(res, 200, { vitrine: loadVitrine(), defaults: normalizeVitrine(DEFAULT_VITRINE) });
+        return;
+    }
+
+    if (url === '/api/admin/vitrine' && req.method === 'PUT') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const body = await parseBody(req, 262144);
+        let data;
+        try { data = JSON.parse(body); } catch { return json(res, 400, { error: 'Invalid JSON' }); }
+        try { json(res, 200, { ok: true, vitrine: saveVitrine(data) }); }
+        catch (e) { json(res, 500, { error: e.message }); }
+        return;
+    }
+
+    if (url === '/api/admin/vitrine/preview' && req.method === 'POST') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const body = await parseBody(req, 262144);
+        let data;
+        try { data = JSON.parse(body); } catch { return json(res, 400, { error: 'Invalid JSON' }); }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(renderVitrine(data, { preview: true }));
+        return;
+    }
+
+    if (url === '/api/admin/health') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        const layout = loadLayout();
+        const targets = new Map();
+        for (const [key, svc] of Object.entries(layout.services)) {
+            const u = (svc.url || '').replace(/\/$/, '');
+            if (/^https?:\/\//.test(u) && !targets.has(u)) targets.set(u, { key, name: svc.name });
+        }
+        for (const h of VITRINE_HOSTS) targets.set(`https://${h}`, { key: '_vitrine', name: 'Vitrine' });
+        const checks = await Promise.all([...targets].map(async ([u, meta]) => ({ ...meta, url: u, ...(await probe(u)) })));
+        json(res, 200, { checks, at: Date.now() });
+        return;
+    }
+
     if (url === '/api/admin/bots') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         const layout = loadLayout();
@@ -564,15 +638,22 @@ const server = http.createServer(async (req, res) => {
 
     // lucipher-lab.fr sert la vitrine publique, les autres domaines (asgard.) le portail
     const host = (req.headers.host || '').split(':')[0].toLowerCase();
-    const indexFile = VITRINE_HOSTS.includes(host) ? 'vitrine.html' : 'index.html';
-    let filePath = path.join(DIST_DIR, url === '/' ? indexFile : url);
+    const isVitrine = VITRINE_HOSTS.includes(host);
+    const sendVitrine = () => {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(renderVitrine(loadVitrine()));
+    };
+    if (isVitrine && url === '/') return sendVitrine();
+
+    let filePath = path.join(DIST_DIR, url === '/' ? 'index.html' : url);
     if (!filePath.startsWith(path.resolve(DIST_DIR))) {
         res.writeHead(403); res.end('Forbidden'); return;
     }
 
     fs.readFile(filePath, (err, data) => {
         if (err) {
-            fs.readFile(path.join(DIST_DIR, indexFile), (e, html) => {
+            if (isVitrine) return sendVitrine();
+            fs.readFile(path.join(DIST_DIR, 'index.html'), (e, html) => {
                 if (e) { res.writeHead(404); res.end('Not found'); return; }
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
                 res.end(html);
@@ -590,6 +671,7 @@ server.listen(PORT, () => {
     if (ADMIN_TOKEN) console.log('Admin auth enabled');
     else console.log('Warning: ADMIN_TOKEN not set, admin disabled');
     console.log(`Layout file: ${LAYOUT_FILE}`);
+    console.log(`Vitrine file: ${VITRINE_FILE}`);
 });
 
 process.on('SIGTERM', () => { clearInterval(cpuInterval); server.close(); });

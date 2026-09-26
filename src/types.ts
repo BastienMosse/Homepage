@@ -45,3 +45,55 @@ export interface ServerStats {
     uptime: number;
     load: { load1: number; load5: number; load15: number };
 }
+
+// --- Vitrine (lucipher-lab.fr), voir server/vitrine.cjs ---
+
+export interface VitrineLink { label: string; href: string; }
+
+export interface VitrineItem {
+    id: string;
+    name: string;
+    desc: string;
+    url: string;
+    visible: boolean;
+    // royaumes uniquement
+    subtitle?: string;
+    icon?: string;
+    open?: boolean;
+    label?: string;
+}
+
+export type VitrineBlockType = 'realms' | 'tools' | 'text' | 'contact';
+
+export interface VitrineBlock {
+    id: string;
+    type: VitrineBlockType;
+    visible: boolean;
+    kicker: string;
+    title: string;
+    text: string;
+    email?: string;
+    items?: VitrineItem[];
+}
+
+export interface Vitrine {
+    hero: {
+        visible: boolean;
+        showGate: boolean;
+        title: string;
+        tagline: string;
+        lead: string;
+        primary: VitrineLink;
+        secondary: VitrineLink;
+    };
+    blocks: VitrineBlock[];
+}
+
+export interface HealthCheck {
+    key: string;
+    name: string;
+    url: string;
+    status: number;
+    ms: number;
+    error?: string;
+}
