@@ -415,17 +415,6 @@ const cpuInterval = setInterval(sampleCpu, 2000);
 const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
 
-    if (url === '/api/config') {
-        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const { sections } = await discover();
-        const filtered = sections
-            .filter(s => !s.adminOnly && !s.hidden)
-            .map(s => ({ ...s, items: s.items.filter(i => !i.hidden) }))
-            .filter(s => s.items.length > 0);
-        json(res, 200, { sections: filtered });
-        return;
-    }
-
     if (url === '/api/auth/check') {
         json(res, 200, { authed: isAuthed(req) });
         return;
@@ -468,16 +457,6 @@ const server = http.createServer(async (req, res) => {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         const { allContainers } = await discover();
         json(res, 200, { containers: allContainers });
-        return;
-    }
-
-    if (url === '/api/admin/services') {
-        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const { sections } = await discover();
-        const filtered = sections
-            .filter(s => s.adminOnly && !s.hidden)
-            .map(s => ({ ...s, items: s.items.filter(i => !i.hidden) }));
-        json(res, 200, { sections: filtered });
         return;
     }
 
@@ -545,11 +524,12 @@ const server = http.createServer(async (req, res) => {
 
     if (url === '/api/admin/health') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const layout = loadLayout();
+        // URLs du layout + celles lues dans les labels Traefik des conteneurs (via discover)
+        const { sections } = await discover();
         const targets = new Map();
-        for (const [key, svc] of Object.entries(layout.services)) {
-            const u = (svc.url || '').replace(/\/$/, '');
-            if (/^https?:\/\//.test(u) && !targets.has(u)) targets.set(u, { key, name: svc.name });
+        for (const item of sections.flatMap(sec => sec.items)) {
+            const u = (item.url || '').replace(/\/$/, '');
+            if (/^https?:\/\//.test(u) && !targets.has(u)) targets.set(u, { key: item.key, name: item.name });
         }
         for (const h of VITRINE_HOSTS) targets.set(`https://${h}`, { key: '_vitrine', name: 'Vitrine' });
         const checks = await Promise.all([...targets].map(async ([u, meta]) => ({ ...meta, url: u, ...(await probe(u)) })));
@@ -660,6 +640,8 @@ const server = http.createServer(async (req, res) => {
         }
         return;
     }
+
+    if (url.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
 
     // --- Static files ---
 

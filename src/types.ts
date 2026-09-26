@@ -1,24 +1,3 @@
-export interface ServiceItem {
-    key?: string;
-    name: string;
-    desc: string;
-    url: string;
-    icon: string;
-    color: string;
-    state?: string;
-    hidden?: boolean;
-    bot?: boolean;
-}
-
-export interface Section {
-    id: string;
-    label: string;
-    icon: string;
-    items: ServiceItem[];
-    adminOnly?: boolean;
-    hidden?: boolean;
-}
-
 export interface Container {
     id: string;
     name: string;
