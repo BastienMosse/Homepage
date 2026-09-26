@@ -3,7 +3,12 @@
      - Rien de coché : « Zip de ce dossier » ; éléments cochés (classe .selected d'OpenList) : « Zip de la sélection (N) »
      - Envoie token + chemin (+ noms cochés) en POST (formulaire caché, rien dans l'URL) à /ygg-zip, que Traefik
        (ygg-zip.yaml) route vers le serveur Asgard (server/ygg-zip.cjs).
-     - Réponse 421 (connexion HTTP/2 d'un autre sous-domaine réutilisée par le navigateur) : renvoi automatique. -->
+     - Réponse 421 (connexion HTTP/2 d'un autre sous-domaine réutilisée par le navigateur) : renvoi automatique.
+     - Menus de téléchargement d'OpenList (nuage de la barre de sélection, clic droit) :
+       dossier ou plusieurs éléments → « Télécharger en zip » (zip serveur) uniquement ;
+       un fichier seul → « Télécharger » (direct, natif) + « Télécharger en zip ».
+       Batch / Playlist Download et Send to Aria2 sont masqués. Le « Package Download » natif (zip fabriqué
+       dans le navigateur) casse au bout d'~30 s sous Firefox : il n'est plus proposé. -->
 <script>
 (() => {
     const btn = document.createElement('button');
@@ -22,13 +27,24 @@
     let lastRequest = null;
     let retries = 0;
 
-    // Noms des éléments cochés (OpenList ajoute la classe « selected » ; le nom est la fin du lien)
+    // Nom d'un élément de la liste (OpenList : la fin de son lien)
+    function itemName(el) {
+        const href = el.getAttribute('href') || '';
+        const last = href.split('?')[0].split('/').filter(Boolean).pop() || '';
+        try { return decodeURIComponent(last); } catch (e) { return last; }
+    }
+
+    // Noms des éléments cochés (OpenList ajoute la classe « selected »)
     function selection() {
-        return [...document.querySelectorAll('.viselect-item.selected')].map(el => {
-            const href = el.getAttribute('href') || '';
-            const last = href.split('?')[0].split('/').filter(Boolean).pop() || '';
-            try { return decodeURIComponent(last); } catch (e) { return last; }
-        }).filter(Boolean);
+        return [...document.querySelectorAll('.viselect-item.selected')].map(itemName).filter(Boolean);
+    }
+
+    // Dossier ? En liste, OpenList affiche « - » comme taille ; sinon on regarde l'icône dossier
+    function isFolder(el) {
+        const size = el.querySelector('.size');
+        if (size) return size.textContent.trim() === '-';
+        const icon = el.querySelector('svg path');
+        return !!icon && /^M496 152a56 56/.test(icon.getAttribute('d') || '');
     }
 
     function render() {
@@ -88,8 +104,7 @@
         render();
     });
 
-    btn.addEventListener('click', () => {
-        const names = selection();
+    function zip(names) {
         lastRequest = [['token', localStorage.getItem('token') || ''], ['path', current || '/']];
         if (names.length) lastRequest.push(['names', JSON.stringify(names)]);
         retries = 0;
@@ -98,7 +113,119 @@
         send(lastRequest);
         // Un téléchargement réussi ne déclenche pas « load » : on rend la main au bout de quelques secondes
         setTimeout(() => { busy = false; render(); }, 6000);
-    });
+    }
+
+    btn.addEventListener('click', () => zip(selection()));
+
+    // --- Menus de téléchargement d'OpenList ---
+    // Le zip natif (« Package Download », clic droit → Download sur un dossier) est fabriqué dans le
+    // navigateur et casse au bout d'~30 s : on le remplace par le zip serveur. Un fichier seul garde
+    // le téléchargement direct natif, avec le zip en option. Batch / Playlist / Aria2 sont masqués.
+
+    const HIDDEN = ['Batch Download', 'Playlist Download', 'Send to Aria2'];
+
+    // Ce qu'un téléchargement viserait : les cochés, ou l'élément sous le clic droit
+    function target(fromContext) {
+        const sel = [...document.querySelectorAll('.viselect-item.selected')];
+        const els = fromContext && contextItem && !(contextItem.classList.contains('selected') && sel.length > 1) ? [contextItem] : sel;
+        return { names: els.map(itemName).filter(Boolean), singleFile: els.length === 1 && !isFolder(els[0]) };
+    }
+
+    // Change le texte d'une entrée de menu sans toucher à sa structure (icône, styles)
+    function relabel(item, text) {
+        const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+            if (node.textContent.trim()) { node.textContent = text; return; }
+        }
+    }
+
+    const labelOf = item => (item.textContent || '').trim();
+    const zipLabel = n => (n > 1 ? `Télécharger en zip (${n})` : 'Télécharger en zip');
+
+    // Menu du nuage (barre de sélection). Libellés d'origine mémorisés : le menu peut être réutilisé
+    // d'une ouverture à l'autre avec une autre sélection
+    function decorateSelectionMenu(menu) {
+        const items = [...menu.querySelectorAll('.hope-menu__item')];
+        items.forEach(i => { if (!i.dataset.yggOrig) i.dataset.yggOrig = labelOf(i); });
+        if (!items.some(i => i.dataset.yggOrig === 'Package Download')) return;
+        const { names, singleFile } = target(false);
+        const sig = names.join('\n') + '|' + singleFile;
+        if (menu.dataset.ygg === sig) return;
+        menu.dataset.ygg = sig;
+        for (const item of items) {
+            const label = item.dataset.yggOrig;
+            item.style.display = '';
+            delete item.dataset.ygg;
+            relabel(item, label);
+            if (label === 'Package Download') { item.dataset.ygg = 'zip'; relabel(item, zipLabel(names.length)); }
+            else if (label === 'Batch Download' && singleFile) relabel(item, 'Télécharger');
+            else if (HIDDEN.includes(label)) item.style.display = 'none';
+        }
+    }
+
+    // Menu du clic droit
+    function decorateContextMenu(menu) {
+        if (menu.dataset.ygg) return;
+        const dl = [...menu.querySelectorAll('.solid-contextmenu__item')].find(i => labelOf(i) === 'Download');
+        if (!dl) return;
+        menu.dataset.ygg = '1';
+        const { names, singleFile } = target(true);
+        if (singleFile) {
+            relabel(dl, 'Télécharger');
+            const z = dl.cloneNode(true);
+            z.dataset.ygg = 'zip';
+            z.dataset.yggClone = '1';
+            relabel(z, 'Télécharger en zip');
+            dl.after(z);
+        } else {
+            dl.dataset.ygg = 'zip';
+            relabel(dl, zipLabel(names.length));
+        }
+    }
+
+    const decorateAll = () => {
+        document.querySelectorAll('.hope-menu__content').forEach(decorateSelectionMenu);
+        document.querySelectorAll('.solid-contextmenu').forEach(decorateContextMenu);
+    };
+    new MutationObserver(decorateAll).observe(document.body, { childList: true, subtree: true });
+    // Filet de sécurité si un menu est rouvert sans être recréé
+    document.addEventListener('click', () => { setTimeout(decorateAll, 0); setTimeout(decorateAll, 80); }, true);
+
+    let contextItem = null; // élément sous le dernier clic droit
+    document.addEventListener('contextmenu', e => {
+        contextItem = e.target.closest && e.target.closest('.viselect-item');
+        // Le menu du clic droit est réutilisé : on le remet dans son état d'origine avant de le transformer
+        document.querySelectorAll('.solid-contextmenu').forEach(m => {
+            m.style.display = '';
+            delete m.dataset.ygg;
+            m.querySelectorAll('[data-ygg-clone]').forEach(c => c.remove());
+            m.querySelectorAll('[data-ygg]').forEach(i => { delete i.dataset.ygg; relabel(i, 'Download'); });
+            const dl = [...m.querySelectorAll('.solid-contextmenu__item')].find(i => labelOf(i) === 'Télécharger');
+            if (dl) relabel(dl, 'Download');
+        });
+        setTimeout(() => document.querySelectorAll('.solid-contextmenu').forEach(decorateContextMenu), 0);
+    }, true);
+
+    // Le clic sur « zip » est intercepté, donc OpenList ne ferme pas son menu : on reclique sur le nuage
+    function closeMenus(from) {
+        const menu = from.closest('.hope-menu__content');
+        const trigger = menu && document.getElementById(menu.getAttribute('aria-labelledby'));
+        // (le déclencheur est un <svg> : pas de .click(), on envoie un vrai événement)
+        if (trigger) setTimeout(() => trigger.dispatchEvent(new MouseEvent('click', { bubbles: true })), 0);
+        document.querySelectorAll('.solid-contextmenu').forEach(m => { m.style.display = 'none'; });
+    }
+
+    // Entrée « zip » cliquée : on court-circuite OpenList et on lance le zip serveur
+    document.addEventListener('click', e => {
+        const item = e.target.closest && e.target.closest('[data-ygg="zip"]');
+        if (!item) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const { names } = target(!!item.closest('.solid-contextmenu'));
+        closeMenus(item);
+        if (names.length) zip(names);
+    }, true);
 
     document.body.appendChild(frame);
     document.body.appendChild(btn);
