@@ -112,13 +112,31 @@ function zipLength(files) {
     return total + 56 + 20 + 22;
 }
 
+const ABORTED = Object.assign(new Error('téléchargement interrompu'), { aborted: true });
+
+// Écrit dans la réponse en respectant la contre-pression ; rejette si le client coupe
+// (sinon on attendrait un « drain » qui ne vient jamais et le zip resterait compté comme actif)
+function writer(out, isAborted) {
+    return chunk => {
+        if (isAborted() || out.destroyed) return Promise.reject(ABORTED);
+        if (out.write(chunk)) return null;
+        return new Promise((resolve, reject) => {
+            const done = err => { out.off('drain', onDrain); out.off('close', onClose); err ? reject(err) : resolve(); };
+            const onDrain = () => done();
+            const onClose = () => done(ABORTED);
+            out.on('drain', onDrain);
+            out.on('close', onClose);
+        });
+    };
+}
+
 // files : [{ name, size, mtime, open: () => Promise<AsyncIterable<Buffer>> }]
 async function writeZip(files, out, isAborted) {
-    const write = chunk => (out.write(chunk) ? null : new Promise(r => out.once('drain', r)));
+    const write = writer(out, isAborted);
     let offset = 0;
     const done = [];
     for (const f of files) {
-        if (isAborted()) return;
+        if (isAborted()) throw ABORTED;
         const name = Buffer.from(f.name);
         const dt = dosDateTime(f.mtime);
         const header = localHeader(name, dt);
@@ -128,8 +146,8 @@ async function writeZip(files, out, isAborted) {
 
         let crc = 0;
         let size = 0;
+        // Sortir de la boucle (exception) annule aussi la lecture côté OpenList
         for await (const chunk of await f.open()) {
-            if (isAborted()) return;
             crc = zlib.crc32(chunk, crc);
             size += chunk.length;
             const w = write(chunk);
@@ -241,6 +259,7 @@ async function handleZip(req, res, { form, resolveBase }) {
         await writeZip(files.map(f => ({ ...f, open: () => fileStream(base, token, f.path) })), res, () => aborted);
         res.end();
     } catch (e) {
+        if (e.aborted || aborted) return; // le navigateur a annulé : rien d'anormal
         console.error('ygg-zip:', e.message);
         if (!res.headersSent) {
             res.writeHead(e.status || 502, { 'Content-Type': 'text/plain; charset=utf-8' });
