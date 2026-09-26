@@ -188,8 +188,10 @@ async function collect(base, token, root, only) {
             page++;
         }
     }
-    // Comme un zip fait à la main : tout dans un dossier au nom du dossier zippé (sauf pour la racine)
-    await walk(root, root.split('/').filter(Boolean).pop() || '', only && only.length ? new Set(only) : null);
+    // Comme un zip fait à la main : dossier entier → tout dans un dossier à son nom (sauf la racine) ;
+    // sélection → les éléments choisis directement à la racine du zip
+    const selection = only && only.length ? new Set(only) : null;
+    await walk(root, selection ? '' : root.split('/').filter(Boolean).pop() || '', selection);
     return files;
 }
 
@@ -225,12 +227,15 @@ async function handleZip(req, res, { form, resolveBase }) {
     try {
         const base = await resolveBase();
         const files = await collect(base, token, root, only);
-        if (!files.length) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Dossier vide.'); return; }
-        const folder = root.split('/').filter(Boolean).pop() || 'yggdrasil';
+        if (!files.length) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Rien à zipper (dossier vide).'); return; }
+        const folder = root.split('/').filter(Boolean).pop() || 'Yggdrasil';
+        // 1 élément coché → son nom ; plusieurs → « dossier (N éléments) » ; aucun → le dossier
+        const zipName = only.length === 1 ? only[0].replace(/\.[^.\/]+$/, '') || only[0]
+            : only.length > 1 ? `${folder} (${only.length} éléments)` : folder;
         res.writeHead(200, {
             'Content-Type': 'application/zip',
             'Content-Length': String(zipLength(files)),
-            'Content-Disposition': contentDisposition(`${folder}.zip`),
+            'Content-Disposition': contentDisposition(`${zipName}.zip`),
             'Cache-Control': 'no-store',
         });
         await writeZip(files.map(f => ({ ...f, open: () => fileStream(base, token, f.path) })), res, () => aborted);

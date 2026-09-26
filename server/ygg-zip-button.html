@@ -1,56 +1,73 @@
-<!-- Bouton « Zip de ce dossier » pour Yggdrasil (OpenList).
+<!-- Bouton « Zip » pour Yggdrasil (OpenList).
      À coller dans OpenList : Gestion → Paramètres → Global → « Customize body » (clé customize_body).
-     Envoie token + chemin en POST (formulaire caché, rien dans l'URL) à /ygg-zip, que Traefik
-     (ygg-zip.yaml) route vers le serveur Asgard (server/ygg-zip.cjs). -->
+     - Rien de coché : « Zip de ce dossier » ; éléments cochés (classe .selected d'OpenList) : « Zip de la sélection (N) »
+     - Envoie token + chemin (+ noms cochés) en POST (formulaire caché, rien dans l'URL) à /ygg-zip, que Traefik
+       (ygg-zip.yaml) route vers le serveur Asgard (server/ygg-zip.cjs).
+     - Réponse 421 (connexion HTTP/2 d'un autre sous-domaine réutilisée par le navigateur) : renvoi automatique. -->
 <script>
 (() => {
-    const LABEL = '⬇ Zip de ce dossier';
     const btn = document.createElement('button');
-    btn.textContent = LABEL;
-    btn.title = 'Télécharger ce dossier en .zip (fabriqué par le serveur, tient sur les gros dossiers)';
     btn.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:9999;display:none;padding:10px 16px;'
         + 'border-radius:999px;border:1px solid rgba(139,92,246,.55);background:#1b1430;color:#e9ddff;'
         + 'font:600 14px system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 24px rgba(109,40,217,.35)';
 
-    // Les erreurs (dossier vide, non connecté…) arrivent dans cette iframe ; un zip, lui, part en téléchargement
+    // Les erreurs (non connecté, 421…) arrivent dans cette iframe ; un zip, lui, part en téléchargement
     const frame = document.createElement('iframe');
     frame.name = 'ygg-zip-frame';
     frame.style.display = 'none';
-    frame.addEventListener('load', () => {
-        try {
-            const msg = frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.textContent;
-            if (msg) alert(msg);
-        } catch (e) { /* rien */ }
-        btn.textContent = LABEL;
-    });
 
-    let current = null;
-    async function check() {
-        const path = decodeURIComponent(location.pathname);
-        if (path === current) return;
-        current = path;
-        const token = localStorage.getItem('token');
-        if (!token || path.startsWith('/@')) { btn.style.display = 'none'; return; }
-        try {
-            const r = await fetch('/api/fs/get', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: token },
-                body: JSON.stringify({ path, password: '' }),
-            });
-            const d = await r.json();
-            btn.style.display = d.code === 200 && d.data && d.data.is_dir ? '' : 'none';
-        } catch (e) {
-            btn.style.display = 'none';
-        }
+    let current = null;   // dossier affiché
+    let isDir = false;
+    let busy = false;
+    let lastRequest = null;
+    let retries = 0;
+
+    // Noms des éléments cochés (OpenList ajoute la classe « selected » ; le nom est la fin du lien)
+    function selection() {
+        return [...document.querySelectorAll('.viselect-item.selected')].map(el => {
+            const href = el.getAttribute('href') || '';
+            const last = href.split('?')[0].split('/').filter(Boolean).pop() || '';
+            try { return decodeURIComponent(last); } catch (e) { return last; }
+        }).filter(Boolean);
     }
 
-    btn.addEventListener('click', () => {
+    function render() {
+        if (!isDir) { btn.style.display = 'none'; return; }
+        btn.style.display = '';
+        if (busy) return;
+        const n = selection().length;
+        btn.textContent = n ? `⬇ Zip de la sélection (${n})` : '⬇ Zip de ce dossier';
+        btn.title = n ? 'Télécharger les éléments cochés en un .zip' : 'Télécharger tout ce dossier en .zip';
+    }
+
+    async function check() {
+        const path = decodeURIComponent(location.pathname);
+        if (path !== current) {
+            current = path;
+            isDir = false;
+            const token = localStorage.getItem('token');
+            if (token && !path.startsWith('/@')) {
+                try {
+                    const r = await fetch('/api/fs/get', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: token },
+                        body: JSON.stringify({ path, password: '' }),
+                    });
+                    const d = await r.json();
+                    isDir = d.code === 200 && !!(d.data && d.data.is_dir);
+                } catch (e) { isDir = false; }
+            }
+        }
+        render();
+    }
+
+    function send(fields) {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '/ygg-zip';
         form.target = 'ygg-zip-frame';
         form.style.display = 'none';
-        for (const [k, v] of [['token', localStorage.getItem('token') || ''], ['path', current || '/']]) {
+        for (const [k, v] of fields) {
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = k;
@@ -60,13 +77,32 @@
         document.body.appendChild(form);
         form.submit();
         form.remove();
+    }
+
+    frame.addEventListener('load', () => {
+        let msg = '';
+        try { msg = (frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.textContent || '').trim(); } catch (e) { /* rien */ }
+        if (/misdirected/i.test(msg) && lastRequest && retries < 2) { retries++; send(lastRequest); return; }
+        busy = false;
+        if (msg) alert(msg);
+        render();
+    });
+
+    btn.addEventListener('click', () => {
+        const names = selection();
+        lastRequest = [['token', localStorage.getItem('token') || ''], ['path', current || '/']];
+        if (names.length) lastRequest.push(['names', JSON.stringify(names)]);
+        retries = 0;
+        busy = true;
         btn.textContent = '⏳ Préparation du zip…';
-        setTimeout(() => { btn.textContent = LABEL; }, 5000);
+        send(lastRequest);
+        // Un téléchargement réussi ne déclenche pas « load » : on rend la main au bout de quelques secondes
+        setTimeout(() => { busy = false; render(); }, 6000);
     });
 
     document.body.appendChild(frame);
     document.body.appendChild(btn);
-    setInterval(check, 800);
+    setInterval(check, 500);
     check();
 })();
 </script>
