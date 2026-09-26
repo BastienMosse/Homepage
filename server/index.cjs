@@ -415,17 +415,6 @@ const cpuInterval = setInterval(sampleCpu, 2000);
 const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
 
-    if (url === '/api/config') {
-        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const { sections } = await discover();
-        const filtered = sections
-            .filter(s => !s.adminOnly && !s.hidden)
-            .map(s => ({ ...s, items: s.items.filter(i => !i.hidden) }))
-            .filter(s => s.items.length > 0);
-        json(res, 200, { sections: filtered });
-        return;
-    }
-
     if (url === '/api/auth/check') {
         json(res, 200, { authed: isAuthed(req) });
         return;
@@ -468,16 +457,6 @@ const server = http.createServer(async (req, res) => {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         const { allContainers } = await discover();
         json(res, 200, { containers: allContainers });
-        return;
-    }
-
-    if (url === '/api/admin/services') {
-        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        const { sections } = await discover();
-        const filtered = sections
-            .filter(s => s.adminOnly && !s.hidden)
-            .map(s => ({ ...s, items: s.items.filter(i => !i.hidden) }));
-        json(res, 200, { sections: filtered });
         return;
     }
 

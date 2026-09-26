@@ -16,6 +16,15 @@ const DEFAULT_VITRINE = {
         primary: { label: 'Explorer les royaumes', href: '#royaumes' },
         secondary: { label: 'Portail Asgard →', href: 'https://asgard.lucipher-lab.fr' },
     },
+    footer: {
+        visible: true,
+        text: '',
+        links: [
+            { label: 'Lucipher Lab', href: 'https://lucipher-lab.fr' },
+            { label: 'Homelab', href: '' },
+            { label: 'Asgard', href: 'https://asgard.lucipher-lab.fr' },
+        ],
+    },
     blocks: [
         {
             id: 'royaumes', type: 'realms', visible: true,
@@ -88,6 +97,13 @@ function normalizeVitrine(input) {
         primary: normalizeLink(h.primary),
         secondary: normalizeLink(h.secondary),
     };
+    // Pied de page absent (vitrine.json d'avant le 2026-09-26) = celui par défaut
+    const f = o.footer && typeof o.footer === 'object' ? o.footer : DEFAULT_VITRINE.footer;
+    const footer = {
+        visible: bool(f.visible, true),
+        text: str(f.text, 600),
+        links: (Array.isArray(f.links) ? f.links : []).slice(0, 12).map(normalizeLink),
+    };
     const seen = new Set();
     const blocks = (Array.isArray(o.blocks) ? o.blocks : []).slice(0, 30)
         .filter(b => b && (BLOCK_TYPES.includes(b.type) || LEGACY_TYPES.includes(b.type)))
@@ -106,7 +122,7 @@ function normalizeVitrine(input) {
                 items: items.slice(0, 40).map((it, j) => normalizeItem(it, j, type)),
             };
         });
-    return { hero, blocks };
+    return { hero, blocks, footer };
 }
 
 // --- Rendu ---
@@ -188,6 +204,19 @@ function renderHero(h) {
 </header>`;
 }
 
+// Liens séparés par « · » ; un lien sans URL s'affiche en simple texte
+function renderFooter(f) {
+    if (!f.visible) return '';
+    const links = f.links.filter(l => l.label).map(l => {
+        const href = safeHref(l.href);
+        return href ? `<a href="${href}">${esc(l.label)}</a>` : esc(l.label);
+    });
+    return `<footer id="pied">
+    ${links.length ? `<div class="wrap mono">${links.join(' · ')}</div>` : ''}
+    ${f.text ? `<p class="wrap footer-text">${esc(f.text)}</p>` : ''}
+</footer>`;
+}
+
 // preview : aperçu dans Asgard (iframe srcdoc) — liens ouverts dans un nouvel onglet, pas d'animation d'apparition
 function renderVitrine(cfg, { preview = false } = {}) {
     const v = normalizeVitrine(cfg);
@@ -215,9 +244,7 @@ ${renderHero(v.hero)}
 ${v.blocks.filter(b => b.visible).map(renderBlock).join('\n\n')}
 </main>
 
-<footer>
-    <div class="wrap mono"><a href="https://lucipher-lab.fr">Lucipher Lab</a> · Homelab · <a href="https://asgard.lucipher-lab.fr">Asgard</a></div>
-</footer>
+${renderFooter(v.footer)}
 
 <script>
     // Apparition douce des blocs au défilement
@@ -363,6 +390,7 @@ const CSS = `
         /* ── Pied ── */
         footer { border-top: 1px solid var(--border); padding: 26px 0 34px; text-align: center }
         footer a { color: var(--muted); text-decoration: none } footer a:hover { color: var(--lilac) }
+        .footer-text { margin: 10px auto 0; color: var(--muted); font-size: .8rem; white-space: pre-line }
 
         .reveal { opacity: 0; transform: translateY(18px); transition: opacity .8s var(--ease), transform .8s var(--ease) }
         .reveal.in { opacity: 1; transform: none }

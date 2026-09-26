@@ -21,13 +21,24 @@ function move<T>(list: T[], from: number, to: number): T[] {
     return next;
 }
 
+// Même règle que slug() côté serveur (accents retirés en plus)
+function toAnchor(v: string) {
+    return v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+}
+
+// Ancres réservées : l'en-tête et le pied de page
+const FIXED_ANCHORS = ['accueil', 'pied'];
+
 function uid(prefix: string, taken: string[]) {
     let i = 1;
     while (taken.includes(`${prefix}-${i}`)) i++;
     return `${prefix}-${i}`;
 }
 
-// Liste réordonnable à la poignée, au pointeur (souris ET doigt — l'API drag HTML5 ne marche pas au tactile)
+// Liste réordonnable au pointeur (l'API drag HTML5 ne marche pas au tactile) :
+// - poignée ⠿ : glisse tout de suite (souris et doigt)
+// - en-tête entier, à la souris : glisse après 6 px de mouvement, sinon c'est un simple clic
 function useReorder(count: number, onMove: (from: number, to: number) => void) {
     const [drag, setDrag] = useState<number | null>(null);
     const [over, setOver] = useState<number | null>(null);
@@ -35,13 +46,25 @@ function useReorder(count: number, onMove: (from: number, to: number) => void) {
     const onMoveRef = useRef(onMove);
     onMoveRef.current = onMove;
 
-    function start(from: number, e: React.PointerEvent) {
+    function begin(from: number, e: React.PointerEvent, threshold: number) {
         e.preventDefault();
         e.stopPropagation();
+        const x0 = e.clientX, y0 = e.clientY;
+        let active = false;
         let target = from;
-        setDrag(from);
-        setOver(from);
+        const activate = () => {
+            active = true;
+            setDrag(from);
+            setOver(from);
+            document.body.classList.add('ve-grabbing');
+        };
+        if (threshold === 0) activate();
+
         const onPointerMove = (ev: PointerEvent) => {
+            if (!active) {
+                if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < threshold) return;
+                activate();
+            }
             target = count;
             for (let j = 0; j < count; j++) {
                 const r = rows.current[j]?.getBoundingClientRect();
@@ -55,8 +78,14 @@ function useReorder(count: number, onMove: (from: number, to: number) => void) {
             window.removeEventListener('pointermove', onPointerMove);
             window.removeEventListener('pointerup', onUp);
             window.removeEventListener('pointercancel', onUp);
+            if (!active) return; // pas bougé : le clic normal (ouvrir / fermer) s'applique
+            document.body.classList.remove('ve-grabbing');
             setDrag(null);
             setOver(null);
+            // Un glisser ne doit pas aussi ouvrir/fermer le bloc au relâchement
+            const swallow = (ce: MouseEvent) => { ce.stopPropagation(); ce.preventDefault(); };
+            window.addEventListener('click', swallow, { capture: true, once: true });
+            setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0);
             if (target !== from && target !== from + 1) onMoveRef.current(from, target > from ? target - 1 : target);
         };
         window.addEventListener('pointermove', onPointerMove);
@@ -70,10 +99,18 @@ function useReorder(count: number, onMove: (from: number, to: number) => void) {
         lineAt: (i: number) => drag !== null && over === i && i !== drag && i !== drag + 1,
         rowRef: (i: number) => (el: HTMLElement | null) => { rows.current[i] = el; },
         handle: (i: number) => ({
-            onPointerDown: (e: React.PointerEvent) => start(i, e),
+            onPointerDown: (e: React.PointerEvent) => begin(i, e, 0),
             onClick: (e: React.MouseEvent) => e.stopPropagation(),
             style: { touchAction: 'none' as const },
             title: 'Glisser pour déplacer',
+        }),
+        // À poser sur l'en-tête : souris uniquement (au doigt, glisser sert à faire défiler la page)
+        area: (i: number) => ({
+            onPointerDown: (e: React.PointerEvent) => {
+                if (e.pointerType !== 'mouse' || e.button !== 0) return;
+                if ((e.target as HTMLElement).closest('button, a, input, textarea, .ve-grip')) return;
+                begin(i, e, 6);
+            },
         }),
     };
 }
@@ -147,6 +184,10 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
         setVitrine(v => v && ({ ...v, hero: { ...v.hero, ...u } }));
     }
 
+    function setFooter(u: Partial<Vitrine['footer']>) {
+        setVitrine(v => v && ({ ...v, footer: { ...v.footer, ...u } }));
+    }
+
     function setBlock(i: number, u: Partial<VitrineBlock>) {
         setVitrine(v => v && ({ ...v, blocks: v.blocks.map((b, j) => (j === i ? { ...b, ...u } : b)) }));
     }
@@ -154,6 +195,19 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
     function focus(id: string) {
         setOpen(o => (o === id ? null : id));
         frameRef.current?.contentWindow?.postMessage({ scrollTo: id }, '*');
+    }
+
+    // Renomme l'ancre d'un bloc et met à jour les liens « #ancienne » de l'en-tête et du pied de page
+    function renameAnchor(i: number, next: string) {
+        const prev = vitrine!.blocks[i].id;
+        const fix = (href: string) => (href === `#${prev}` ? `#${next}` : href);
+        setVitrine(v => v && ({
+            ...v,
+            hero: { ...v.hero, primary: { ...v.hero.primary, href: fix(v.hero.primary.href) }, secondary: { ...v.hero.secondary, href: fix(v.hero.secondary.href) } },
+            blocks: v.blocks.map((b, j) => (j === i ? { ...b, id: next } : b)),
+            footer: { ...v.footer, links: v.footer.links.map(l => ({ ...l, href: fix(l.href) })) },
+        }));
+        setOpen(next);
     }
 
     function moveBlock(i: number, dir: -1 | 1) {
@@ -191,6 +245,7 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
 
     const scale = device === 'desktop' && stageWidth ? Math.min(1, stageWidth / DESKTOP_WIDTH) : 1;
     const hero = vitrine.hero;
+    const footer = vitrine.footer;
 
     return (
         <div className="ve">
@@ -241,7 +296,7 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
                             <div className="ve-block-body">
                                 <label className="le-checkbox" style={{ marginTop: 0 }}>
                                     <input type="checkbox" checked={hero.showGate} onChange={e => setHero({ showGate: e.target.checked })} />
-                                    Afficher la Porte des 7 royaumes
+                                    Afficher le gif
                                 </label>
                                 <Field label="Titre" value={hero.title} onChange={v => setHero({ title: v })} />
                                 <Field label="Baseline" value={hero.tagline} onChange={v => setHero({ tagline: v })} />
@@ -254,7 +309,7 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
                                     <Field label="Bouton secondaire" value={hero.secondary.label} onChange={v => setHero({ secondary: { ...hero.secondary, label: v } })} />
                                     <Field label="Lien" value={hero.secondary.href} onChange={v => setHero({ secondary: { ...hero.secondary, href: v } })} placeholder="https://..." />
                                 </div>
-                                <p className="le-hint">Lien vers un bloc : #id du bloc ({vitrine.blocks.map(b => `#${b.id}`).join(', ')})</p>
+                                <p className="le-hint">Lien vers un bloc : son ancre ({vitrine.blocks.map(b => `#${b.id}`).join(', ')})</p>
                             </div>
                         )}
                     </div>
@@ -264,7 +319,7 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
                         <Fragment key={b.id}>
                             {blockList.lineAt(i) && <div className="le-section-drop-line" />}
                             <div ref={blockList.rowRef(i)} className={`ve-block ${b.visible ? '' : 've-off'} ${blockList.drag === i ? 've-dragging' : ''}`}>
-                                <div className="ve-block-head" onClick={() => focus(b.id)}>
+                                <div className="ve-block-head" onClick={() => focus(b.id)} {...blockList.area(i)}>
                                     <span className="ve-grip" {...blockList.handle(i)}><GripVertical size={16} /></span>
                                     <span className="ve-block-title">{b.title || b.kicker || BLOCK_LABELS[b.type]}</span>
                                     {b.type === 'realms' && <span className="le-badge">{BLOCK_LABELS.realms}</span>}
@@ -279,6 +334,8 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
                                 {open === b.id && (
                                     <BlockForm
                                         block={b}
+                                        takenAnchors={[...FIXED_ANCHORS, ...vitrine.blocks.filter((_, j) => j !== i).map(x => x.id)]}
+                                        onRename={next => renameAnchor(i, next)}
                                         onChange={u => setBlock(i, u)}
                                         onDelete={() => {
                                             if (!confirm(`Supprimer le bloc « ${b.title || b.id} » ?`)) return;
@@ -303,6 +360,44 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
                             Ajouter un bloc
                         </button>
                     )}
+
+                    {/* Pied de page */}
+                    <div className={`ve-block ${footer.visible ? '' : 've-off'}`}>
+                        <div className="ve-block-head" onClick={() => focus('pied')}>
+                            <LayoutTemplate size={13} style={{ transform: 'rotate(180deg)' }} />
+                            <span className="ve-block-title">Pied de page</span>
+                            <span className="le-badge le-badge-dim">fixe en bas</span>
+                            <VisibleToggle on={footer.visible} onChange={v => setFooter({ visible: v })} />
+                            <ChevronRight size={14} className={`ve-chev ${open === 'pied' ? 've-chev-open' : ''}`} />
+                        </div>
+                        {open === 'pied' && (
+                            <div className="ve-block-body">
+                                <span className="le-label">Liens (séparés par « · » ; sans URL = simple texte)</span>
+                                <div className="ve-items">
+                                    {footer.links.map((l, i) => (
+                                        <div key={i} className="ve-row ve-footer-link">
+                                            <Field label="Texte" value={l.label}
+                                                onChange={v => setFooter({ links: footer.links.map((x, j) => (j === i ? { ...x, label: v } : x)) })} />
+                                            <Field label="URL" value={l.href} placeholder="https://..."
+                                                onChange={v => setFooter({ links: footer.links.map((x, j) => (j === i ? { ...x, href: v } : x)) })} />
+                                            <div className="ve-arrows">
+                                                <button className="le-icon-btn" disabled={i === 0} title="Monter"
+                                                    onClick={() => setFooter({ links: move(footer.links, i, i - 1) })}><ChevronUp size={14} /></button>
+                                                <button className="le-icon-btn" title="Retirer" style={{ color: '#e2685f' }}
+                                                    onClick={() => setFooter({ links: footer.links.filter((_, j) => j !== i) })}><Trash2 size={13} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button className="le-add-section" style={{ padding: 10 }}
+                                        onClick={() => setFooter({ links: [...footer.links, { label: 'Nouveau lien', href: '' }] })}>
+                                        <Plus size={13} />
+                                        Ajouter un lien
+                                    </button>
+                                </div>
+                                <Field label="Texte sous les liens (facultatif)" value={footer.text} onChange={v => setFooter({ text: v })} multiline placeholder="© 2026 Lucipher Lab" />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="ve-preview">
@@ -356,8 +451,10 @@ function Field({ label, value, onChange, multiline, placeholder }: {
     );
 }
 
-function BlockForm({ block, onChange, onDelete }: {
+function BlockForm({ block, takenAnchors, onRename, onChange, onDelete }: {
     block: VitrineBlock;
+    takenAnchors: string[];
+    onRename: (next: string) => void;
     onChange: (u: Partial<VitrineBlock>) => void;
     onDelete: () => void;
 }) {
@@ -389,7 +486,7 @@ function BlockForm({ block, onChange, onDelete }: {
                             <Fragment key={it.id}>
                                 {list.lineAt(i) && <div className="le-drop-line" />}
                                 <div ref={list.rowRef(i)} className={`ve-item ${it.visible ? '' : 've-off'} ${list.drag === i ? 've-dragging' : ''}`}>
-                                    <div className="ve-item-head" onClick={() => setOpenItem(o => (o === it.id ? null : it.id))}>
+                                    <div className="ve-item-head" onClick={() => setOpenItem(o => (o === it.id ? null : it.id))} {...list.area(i)}>
                                         <span className="ve-grip" {...list.handle(i)}><GripVertical size={15} /></span>
                                         {it.icon && <ItemIcon icon={it.icon} size={26} />}
                                         <div className="le-card-info">
@@ -420,13 +517,40 @@ function BlockForm({ block, onChange, onDelete }: {
                         </button>
             </div>
 
+            <AnchorField value={block.id} taken={takenAnchors} onCommit={onRename} />
+
             <div className="ve-block-foot">
-                <span className="le-hint">Ancre : #{block.id}</span>
                 <button className="btn btn-ghost btn-sm" style={{ color: '#e2685f', flex: 'none' }} onClick={onDelete}>
                     <Trash2 size={12} /> Supprimer le bloc
                 </button>
             </div>
         </div>
+    );
+}
+
+// Appliquée à la validation (Entrée / sortie du champ) : l'ancre identifie le bloc dans l'éditeur
+function AnchorField({ value, taken, onCommit }: { value: string; taken: string[]; onCommit: (v: string) => void }) {
+    const [draft, setDraft] = useState(value);
+    useEffect(() => setDraft(value), [value]);
+    const next = toAnchor(draft);
+    const error = !next ? 'Ancre vide' : taken.includes(next) ? `#${next} est déjà utilisée` : '';
+
+    function commit() {
+        if (error || next === value) { setDraft(value); return; }
+        onCommit(next);
+    }
+
+    return (
+        <label className="ve-field">
+            <span className="le-label">Ancre (lien vers ce bloc : #{next || '…'})</span>
+            <input
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onBlur={commit}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setDraft(value); }}
+            />
+            {draft !== value && (error ? <p className="le-error">{error}</p> : <p className="le-hint">Entrée pour valider → #{next}</p>)}
+        </label>
     );
 }
 

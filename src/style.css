@@ -1427,7 +1427,7 @@ body::before {
 .lock-screen .modal { text-align: center; }
 .lock-mark { display: block; margin: 0 auto 12px; filter: drop-shadow(0 0 20px rgba(139,92,246,.35)); }
 
-/* --- Téléphone : onglets en bas (au pouce), cartes en 2 colonnes, en-têtes compacts --- */
+/* --- Téléphone : onglets en bas (au pouce), en-têtes compacts --- */
 .ve-mobile-switch { display: none; }
 @media (max-width: 600px) {
     body { padding-bottom: calc(62px + env(safe-area-inset-bottom)); }
@@ -1451,27 +1451,7 @@ body::before {
     .admin-nav .admin-nav-logout { flex: 0 0 44px; margin-left: 0; }
 
     .page { padding: 28px 14px 24px; }
-    .hero { margin-bottom: 26px; }
-    .hero-mark { width: 56px; height: 56px; margin-bottom: 8px; }
-    .logo { font-size: 1.6rem; }
-    .tagline { font-size: .78rem; }
     .section { margin-bottom: 28px; }
-    .cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .card {
-        flex-direction: column;
-        text-align: center;
-        gap: 8px;
-        padding: 16px 10px 14px;
-    }
-    .card:hover { transform: none; }
-    .card-text { width: 100%; }
-    .card-desc {
-        font-size: .66rem;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
 
     .stats-panel { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .sp-health { grid-template-columns: 1fr; }
@@ -1535,7 +1515,11 @@ body::before {
 }
 .ve-grip:hover { color: var(--text); background: var(--surface-hover); }
 .ve-grip:active { cursor: grabbing; }
+/* À la souris, tout l'en-tête d'un bloc / d'une porte se déplace (clic simple = ouvrir) */
+body.ve-grabbing, body.ve-grabbing * { cursor: grabbing !important; user-select: none; }
 .ve-dragging { opacity: .4; }
 .ve-arrows { display: flex; gap: 3px; flex-shrink: 0; }
 .ve-arrows .le-icon-btn { padding: 5px; }
 .ve-arrows .le-icon-btn:disabled { opacity: .2; cursor: default; }
+.ve-footer-link { align-items: flex-end; }
+.ve-footer-link .ve-arrows { padding-bottom: 4px; }
