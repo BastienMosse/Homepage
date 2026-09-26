@@ -1,3 +1,24 @@
+export interface ServiceItem {
+    key?: string;
+    name: string;
+    desc: string;
+    url: string;
+    icon: string;
+    color: string;
+    state?: string;
+    hidden?: boolean;
+    bot?: boolean;
+}
+
+export interface Section {
+    id: string;
+    label: string;
+    icon: string;
+    items: ServiceItem[];
+    adminOnly?: boolean;
+    hidden?: boolean;
+}
+
 export interface Container {
     id: string;
     name: string;
@@ -35,14 +56,15 @@ export interface VitrineItem {
     desc: string;
     url: string;
     visible: boolean;
-    // royaumes uniquement
-    subtitle?: string;
     icon?: string;
+    // Portail (portes) uniquement
+    subtitle?: string;
     open?: boolean;
     label?: string;
 }
 
-export type VitrineBlockType = 'realms' | 'tools' | 'text' | 'contact';
+// realms = le Portail (portes des royaumes) ; classic = titre + texte + services
+export type VitrineBlockType = 'realms' | 'classic';
 
 export interface VitrineBlock {
     id: string;
@@ -51,8 +73,7 @@ export interface VitrineBlock {
     kicker: string;
     title: string;
     text: string;
-    email?: string;
-    items?: VitrineItem[];
+    items: VitrineItem[];
 }
 
 export interface Vitrine {

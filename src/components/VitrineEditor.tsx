@@ -7,10 +7,8 @@ import {
 } from 'lucide-react';
 
 const BLOCK_LABELS: Record<VitrineBlockType, string> = {
-    realms: 'Royaumes (portes)',
-    tools: 'Outils (liens)',
-    text: 'Texte',
-    contact: 'Contact',
+    realms: 'Portail',
+    classic: 'Bloc classique',
 };
 
 const VITRINE_URL = 'https://lucipher-lab.fr';
@@ -29,31 +27,53 @@ function uid(prefix: string, taken: string[]) {
     return `${prefix}-${i}`;
 }
 
-// Liste réordonnable au glisser-déposer (poignée) + flèches
-function useDragList(onMove: (from: number, to: number) => void) {
+// Liste réordonnable à la poignée, au pointeur (souris ET doigt — l'API drag HTML5 ne marche pas au tactile)
+function useReorder(count: number, onMove: (from: number, to: number) => void) {
     const [drag, setDrag] = useState<number | null>(null);
     const [over, setOver] = useState<number | null>(null);
+    const rows = useRef<(HTMLElement | null)[]>([]);
+    const onMoveRef = useRef(onMove);
+    onMoveRef.current = onMove;
+
+    function start(from: number, e: React.PointerEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        let target = from;
+        setDrag(from);
+        setOver(from);
+        const onPointerMove = (ev: PointerEvent) => {
+            target = count;
+            for (let j = 0; j < count; j++) {
+                const r = rows.current[j]?.getBoundingClientRect();
+                if (r && ev.clientY < r.top + r.height / 2) { target = j; break; }
+            }
+            setOver(target);
+            if (ev.clientY < 70) window.scrollBy(0, -14);
+            else if (ev.clientY > window.innerHeight - 90) window.scrollBy(0, 14);
+        };
+        const onUp = () => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onUp);
+            window.removeEventListener('pointercancel', onUp);
+            setDrag(null);
+            setOver(null);
+            if (target !== from && target !== from + 1) onMoveRef.current(from, target > from ? target - 1 : target);
+        };
+        window.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+    }
+
     return {
-        drag, over,
-        row: (i: number) => ({
-            onDragOver: (e: React.DragEvent) => {
-                if (drag === null) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const r = e.currentTarget.getBoundingClientRect();
-                setOver(e.clientY < r.top + r.height / 2 ? i : i + 1);
-            },
-            onDrop: (e: React.DragEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (drag !== null && over !== null) onMove(drag, drag < over ? over - 1 : over);
-                setDrag(null); setOver(null);
-            },
-        }),
+        drag,
+        // Ligne d'insertion affichée avant l'élément i (ou à la fin si i === count)
+        lineAt: (i: number) => drag !== null && over === i && i !== drag && i !== drag + 1,
+        rowRef: (i: number) => (el: HTMLElement | null) => { rows.current[i] = el; },
         handle: (i: number) => ({
-            draggable: true,
-            onDragStart: (e: React.DragEvent) => { e.stopPropagation(); setDrag(i); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); },
-            onDragEnd: () => { setDrag(null); setOver(null); },
+            onPointerDown: (e: React.PointerEvent) => start(i, e),
+            onClick: (e: React.MouseEvent) => e.stopPropagation(),
+            style: { touchAction: 'none' as const },
+            title: 'Glisser pour déplacer',
         }),
     };
 }
@@ -66,7 +86,9 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState('');
-    const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
+    // Sur téléphone : aperçu mobile par défaut, et on bascule entre édition et aperçu
+    const [device, setDevice] = useState<'desktop' | 'mobile'>(() => (window.innerWidth < 900 ? 'mobile' : 'desktop'));
+    const [mobileView, setMobileView] = useState<'edit' | 'preview'>('edit');
     const [html, setHtml] = useState('');
     const [adding, setAdding] = useState(false);
 
@@ -112,7 +134,8 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
         return () => ro.disconnect();
     }, [vitrine === null]);
 
-    const blockList = useDragList((from, to) => vitrine && setVitrine({ ...vitrine, blocks: move(vitrine.blocks, from, to) }));
+    const blockList = useReorder(vitrine?.blocks.length ?? 0,
+        (from, to) => setVitrine(v => v && ({ ...v, blocks: move(v.blocks, from, to) })));
 
     if (!vitrine) {
         return <div className="ve"><p style={{ color: 'var(--text-dim)' }}>Chargement...</p></div>;
@@ -133,11 +156,13 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
         frameRef.current?.contentWindow?.postMessage({ scrollTo: id }, '*');
     }
 
+    function moveBlock(i: number, dir: -1 | 1) {
+        setVitrine(v => v && ({ ...v, blocks: move(v.blocks, i, i + dir) }));
+    }
+
     function addBlock(type: VitrineBlockType) {
-        const id = uid(type === 'realms' ? 'royaumes' : type === 'tools' ? 'outils' : type, vitrine!.blocks.map(b => b.id));
-        const block: VitrineBlock = { id, type, visible: true, kicker: '', title: 'Nouveau bloc', text: '' };
-        if (type === 'realms' || type === 'tools') block.items = [];
-        if (type === 'contact') block.email = 'contact@lucipher-lab.fr';
+        const id = uid(type === 'realms' ? 'portail' : 'bloc', vitrine!.blocks.map(b => b.id));
+        const block: VitrineBlock = { id, type, visible: true, kicker: '', title: type === 'realms' ? 'Les royaumes' : 'Nouveau bloc', text: '', items: [] };
         setVitrine({ ...vitrine!, blocks: [...vitrine!.blocks, block] });
         setOpen(id);
         setAdding(false);
@@ -196,7 +221,12 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
             </div>
             {error && <p className="le-error" style={{ marginBottom: 12 }}>{error}</p>}
 
-            <div className="ve-layout">
+            <div className="ve-mobile-switch">
+                <button className={mobileView === 'edit' ? 'active' : ''} onClick={() => setMobileView('edit')}>Édition</button>
+                <button className={mobileView === 'preview' ? 'active' : ''} onClick={() => setMobileView('preview')}>Aperçu</button>
+            </div>
+
+            <div className={`ve-layout ve-show-${mobileView}`}>
                 <div className="ve-panel">
                     {/* En-tête */}
                     <div className={`ve-block ${hero.visible ? '' : 've-off'}`}>
@@ -232,18 +262,16 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
                     {/* Blocs réordonnables */}
                     {vitrine.blocks.map((b, i) => (
                         <Fragment key={b.id}>
-                            {blockList.drag !== null && blockList.over === i && blockList.drag !== i && <div className="le-section-drop-line" />}
-                            <div className={`ve-block ${b.visible ? '' : 've-off'} ${blockList.drag === i ? 'le-section-dragging' : ''}`} {...blockList.row(i)}>
+                            {blockList.lineAt(i) && <div className="le-section-drop-line" />}
+                            <div ref={blockList.rowRef(i)} className={`ve-block ${b.visible ? '' : 've-off'} ${blockList.drag === i ? 've-dragging' : ''}`}>
                                 <div className="ve-block-head" onClick={() => focus(b.id)}>
-                                    <span className="le-section-grip" {...blockList.handle(i)} onClick={e => e.stopPropagation()}><GripVertical size={14} /></span>
+                                    <span className="ve-grip" {...blockList.handle(i)}><GripVertical size={16} /></span>
                                     <span className="ve-block-title">{b.title || b.kicker || BLOCK_LABELS[b.type]}</span>
-                                    <span className="le-badge">{BLOCK_LABELS[b.type]}</span>
-                                    {b.items && <span className="le-badge le-badge-dim">{b.items.filter(x => x.visible).length}/{b.items.length}</span>}
-                                    <div className="le-section-arrows" onClick={e => e.stopPropagation()}>
-                                        <button className="le-icon-btn" disabled={i === 0} title="Monter"
-                                            onClick={() => setVitrine({ ...vitrine, blocks: move(vitrine.blocks, i, i - 1) })}><ChevronUp size={11} /></button>
-                                        <button className="le-icon-btn" disabled={i === vitrine.blocks.length - 1} title="Descendre"
-                                            onClick={() => setVitrine({ ...vitrine, blocks: move(vitrine.blocks, i, i + 1) })}><ChevronDown size={11} /></button>
+                                    {b.type === 'realms' && <span className="le-badge">{BLOCK_LABELS.realms}</span>}
+                                    {b.items.length > 0 && <span className="le-badge le-badge-dim">{b.items.filter(x => x.visible).length}/{b.items.length}</span>}
+                                    <div className="ve-arrows" onClick={e => e.stopPropagation()}>
+                                        <button className="le-icon-btn" disabled={i === 0} title="Monter" onClick={() => moveBlock(i, -1)}><ChevronUp size={14} /></button>
+                                        <button className="le-icon-btn" disabled={i === vitrine.blocks.length - 1} title="Descendre" onClick={() => moveBlock(i, 1)}><ChevronDown size={14} /></button>
                                     </div>
                                     <VisibleToggle on={b.visible} onChange={v => setBlock(i, { visible: v })} />
                                     <ChevronRight size={14} className={`ve-chev ${open === b.id ? 've-chev-open' : ''}`} />
@@ -261,13 +289,12 @@ export default function VitrineEditor({ onBack }: { onBack: () => void }) {
                             </div>
                         </Fragment>
                     ))}
-                    {blockList.drag !== null && blockList.over === vitrine.blocks.length && <div className="le-section-drop-line" />}
+                    {blockList.lineAt(vitrine.blocks.length) && <div className="le-section-drop-line" />}
 
                     {adding ? (
                         <div className="ve-add-menu">
-                            {(Object.keys(BLOCK_LABELS) as VitrineBlockType[]).map(t => (
-                                <button key={t} className="btn btn-ghost btn-sm" onClick={() => addBlock(t)}>{BLOCK_LABELS[t]}</button>
-                            ))}
+                            <button className="btn btn-ghost btn-sm" onClick={() => addBlock('classic')}>Bloc classique (titre, texte, services)</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => addBlock('realms')}>Portail (portes des royaumes)</button>
                             <button className="btn btn-ghost btn-sm" onClick={() => setAdding(false)}>Annuler</button>
                         </div>
                     ) : (
@@ -334,19 +361,19 @@ function BlockForm({ block, onChange, onDelete }: {
     onChange: (u: Partial<VitrineBlock>) => void;
     onDelete: () => void;
 }) {
-    const items = block.items || [];
+    const items = block.items;
     const [openItem, setOpenItem] = useState<string | null>(null);
-    const list = useDragList((from, to) => onChange({ items: move(items, from, to) }));
+    const list = useReorder(items.length, (from, to) => onChange({ items: move(items, from, to) }));
 
     function setItem(i: number, u: Partial<VitrineItem>) {
         onChange({ items: items.map((it, j) => (j === i ? { ...it, ...u } : it)) });
     }
 
     function addItem() {
-        const id = uid(block.type === 'realms' ? 'royaume' : 'outil', items.map(it => it.id));
+        const id = uid(block.type === 'realms' ? 'porte' : 'service', items.map(it => it.id));
         const item: VitrineItem = block.type === 'realms'
-            ? { id, name: 'Nouveau royaume', subtitle: '', desc: '', url: '', icon: 'lucipher-lab', open: false, label: 'Ouvrir →', visible: true }
-            : { id, name: 'Nouvel outil', desc: '', url: '', visible: true };
+            ? { id, name: 'Nouvelle porte', subtitle: '', desc: '', url: '', icon: 'lucipher-lab', open: false, label: 'Ouvrir →', visible: true }
+            : { id, name: 'Nouveau service', desc: '', url: '', icon: '', visible: true };
         onChange({ items: [...items, item] });
         setOpenItem(id);
     }
@@ -356,21 +383,15 @@ function BlockForm({ block, onChange, onDelete }: {
             <Field label="Surtitre" value={block.kicker} onChange={v => onChange({ kicker: v })} />
             <Field label="Titre" value={block.title} onChange={v => onChange({ title: v })} />
             <Field label="Texte" value={block.text} onChange={v => onChange({ text: v })} multiline />
-            {block.type === 'contact' && (
-                <Field label="Email" value={block.email || ''} onChange={v => onChange({ email: v })} />
-            )}
-
-            {block.items && (
-                <>
-                    <span className="le-label">{block.type === 'realms' ? 'Portes' : 'Liens'} — glisser pour réordonner</span>
-                    <div className="ve-items">
+            <span className="le-label">{block.type === 'realms' ? 'Portes' : 'Services'} — glisser la poignée pour réordonner</span>
+            <div className="ve-items">
                         {items.map((it, i) => (
                             <Fragment key={it.id}>
-                                {list.drag !== null && list.over === i && list.drag !== i && <div className="le-drop-line" />}
-                                <div className={`ve-item ${it.visible ? '' : 've-off'} ${list.drag === i ? 'le-card-dragging' : ''}`} {...list.row(i)}>
+                                {list.lineAt(i) && <div className="le-drop-line" />}
+                                <div ref={list.rowRef(i)} className={`ve-item ${it.visible ? '' : 've-off'} ${list.drag === i ? 've-dragging' : ''}`}>
                                     <div className="ve-item-head" onClick={() => setOpenItem(o => (o === it.id ? null : it.id))}>
-                                        <span className="le-card-grip" {...list.handle(i)} onClick={e => e.stopPropagation()}><GripVertical size={13} /></span>
-                                        {block.type === 'realms' && <ItemIcon icon={it.icon} size={26} />}
+                                        <span className="ve-grip" {...list.handle(i)}><GripVertical size={15} /></span>
+                                        {it.icon && <ItemIcon icon={it.icon} size={26} />}
                                         <div className="le-card-info">
                                             <div className="le-card-name">{it.name || '(sans nom)'}</div>
                                             <div className="le-card-desc">{it.subtitle || it.url || it.desc}</div>
@@ -392,14 +413,12 @@ function BlockForm({ block, onChange, onDelete }: {
                                 </div>
                             </Fragment>
                         ))}
-                        {list.drag !== null && list.over === items.length && <div className="le-drop-line" />}
+                        {list.lineAt(items.length) && <div className="le-drop-line" />}
                         <button className="le-add-section" style={{ padding: 10 }} onClick={addItem}>
                             <Plus size={13} />
-                            {block.type === 'realms' ? 'Ajouter une porte' : 'Ajouter un lien'}
+                            {block.type === 'realms' ? 'Ajouter une porte' : 'Ajouter un service'}
                         </button>
-                    </div>
-                </>
-            )}
+            </div>
 
             <div className="ve-block-foot">
                 <span className="le-hint">Ancre : #{block.id}</span>
@@ -435,10 +454,12 @@ function ItemForm({ type, item, onChange, onDelete }: {
                 <Field label="URL" value={item.url} onChange={v => onChange({ url: v })} placeholder="https://..." />
                 {type === 'realms' && <Field label="Texte du bouton" value={item.label || ''} onChange={v => onChange({ label: v })} placeholder="Ouvrir →" />}
             </div>
-            {type === 'realms' && (
-                <>
-                    <span className="le-label">Ic&ocirc;ne</span>
+            <>
+                    <span className="le-label">Ic&ocirc;ne{type === 'classic' ? ' (facultative)' : ''}</span>
                     <div className="le-icon-picker">
+                        {type === 'classic' && (
+                            <button className={`le-icon-option ${!item.icon ? 'active' : ''}`} onClick={() => onChange({ icon: '' })} title="Sans icône">∅</button>
+                        )}
                         {BRAND_ICONS.map(b => (
                             <button key={b} className={`le-icon-option le-icon-option-brand ${item.icon === b ? 'active' : ''}`}
                                 onClick={() => onChange({ icon: b })} title={b}>
@@ -447,9 +468,8 @@ function ItemForm({ type, item, onChange, onDelete }: {
                         ))}
                     </div>
                     <Field label="…ou URL d'image" value={custom ? item.icon || '' : ''} onChange={v => onChange({ icon: v })} placeholder="/brand/... ou https://..." />
-                    {item.open && !item.url && <p className="le-error">Porte ouverte sans URL : elle s'affichera « Réservé ».</p>}
-                </>
-            )}
+                    {type === 'realms' && item.open && !item.url && <p className="le-error">Porte ouverte sans URL : elle s'affichera « Réservé ».</p>}
+            </>
             <div className="ve-block-foot">
                 <button className="btn btn-ghost btn-sm" style={{ color: '#e2685f', flex: 'none' }} onClick={onDelete}>
                     <Trash2 size={12} /> Retirer

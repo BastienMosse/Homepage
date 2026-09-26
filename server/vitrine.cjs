@@ -1,7 +1,10 @@
 // Vitrine publique (lucipher-lab.fr) : rendue côté serveur depuis vitrine.json,
 // éditable depuis Asgard (onglet Vitrine). Tout le texte est échappé, les liens filtrés.
 
-const BLOCK_TYPES = ['realms', 'tools', 'text', 'contact'];
+// realms = le Portail (portes des royaumes, ouvertes ou « Réservé ») ; classic = titre + texte + services
+const BLOCK_TYPES = ['realms', 'classic'];
+// Anciens types (avant le 2026-09-26) convertis en bloc classique au chargement
+const LEGACY_TYPES = ['tools', 'text', 'contact'];
 
 const DEFAULT_VITRINE = {
     hero: {
@@ -29,7 +32,7 @@ const DEFAULT_VITRINE = {
             ],
         },
         {
-            id: 'midgard', type: 'tools', visible: true,
+            id: 'midgard', type: 'classic', visible: true,
             kicker: 'Midgard', title: 'Les outils ouverts',
             text: 'Le monde des humains : ce que le lab met à disposition de tous.',
             items: [
@@ -40,8 +43,11 @@ const DEFAULT_VITRINE = {
             ],
         },
         {
-            id: 'contact', type: 'contact', visible: true,
-            kicker: 'Contact', title: 'Un message pour les dieux ?', email: 'contact@lucipher-lab.fr',
+            id: 'contact', type: 'classic', visible: true,
+            kicker: 'Contact', title: 'Un message pour les dieux ?', text: '',
+            items: [
+                { id: 'mail', name: 'contact@lucipher-lab.fr', visible: true, url: 'mailto:contact@lucipher-lab.fr', desc: 'Écrire au lab.' },
+            ],
         },
     ],
 };
@@ -66,7 +72,7 @@ function normalizeItem(it, i, type) {
         url: str(o.url, 300),
         visible: bool(o.visible, true),
     };
-    if (type !== 'realms') return base;
+    if (type !== 'realms') return { ...base, icon: str(o.icon, 300) };
     return { ...base, subtitle: str(o.subtitle, 80), icon: str(o.icon, 300), open: bool(o.open, false), label: str(o.label, 40) };
 }
 
@@ -84,17 +90,21 @@ function normalizeVitrine(input) {
     };
     const seen = new Set();
     const blocks = (Array.isArray(o.blocks) ? o.blocks : []).slice(0, 30)
-        .filter(b => b && BLOCK_TYPES.includes(b.type))
+        .filter(b => b && (BLOCK_TYPES.includes(b.type) || LEGACY_TYPES.includes(b.type)))
         .map((b, i) => {
             let id = slug(b.id) || `bloc-${i}`;
             while (seen.has(id)) id += '-2';
             seen.add(id);
-            const block = { id, type: b.type, visible: bool(b.visible, true), kicker: str(b.kicker, 80), title: str(b.title, 120), text: str(b.text, 2000) };
-            if (b.type === 'contact') block.email = str(b.email, 120);
-            if (b.type === 'realms' || b.type === 'tools') {
-                block.items = (Array.isArray(b.items) ? b.items : []).slice(0, 40).map((it, j) => normalizeItem(it, j, b.type));
+            const type = b.type === 'realms' ? 'realms' : 'classic';
+            let items = Array.isArray(b.items) ? b.items : [];
+            if (b.type === 'contact' && b.email) {
+                items = [{ id: 'mail', name: b.email, url: `mailto:${b.email}`, desc: '', visible: true }];
             }
-            return block;
+            return {
+                id, type, visible: bool(b.visible, true),
+                kicker: str(b.kicker, 80), title: str(b.title, 120), text: str(b.text, 2000),
+                items: items.slice(0, 40).map((it, j) => normalizeItem(it, j, type)),
+            };
         });
     return { hero, blocks };
 }
@@ -141,9 +151,11 @@ function renderRealm(r) {
                 </article>`;
 }
 
-function renderTool(t) {
+function renderService(t) {
     const href = safeHref(t.url);
-    const inner = `<b>${esc(t.name)} <span>→</span></b>${t.desc ? `<small>${esc(t.desc)}</small>` : ''}`;
+    const src = iconSrc(t.icon);
+    const icon = src ? `<img src="${src}" alt="" width="40" height="40">` : '';
+    const inner = `${icon}<div><b>${esc(t.name)} <span>→</span></b>${t.desc ? `<small>${esc(t.desc)}</small>` : ''}</div>`;
     return href ? `<a class="tool reveal" href="${href}">${inner}</a>` : `<div class="tool reveal">${inner}</div>`;
 }
 
@@ -153,19 +165,9 @@ function renderBlock(b) {
         case 'realms':
             return `<section id="${esc(b.id)}"><div class="wrap">${head(b)}
             <div class="realms">${items.map(renderRealm).join('\n')}</div></div></section>`;
-        case 'tools':
-            return `<section id="${esc(b.id)}"><div class="wrap">${head(b)}
-            <div class="tools">${items.map(renderTool).join('\n')}</div></div></section>`;
-        case 'text':
-            return `<section id="${esc(b.id)}" class="prose"><div class="wrap">${head(b)}</div></section>`;
-        case 'contact': {
-            const mail = b.email ? `<a class="mail" href="mailto:${esc(b.email)}">${esc(b.email)}</a>` : '';
-            return `<section id="${esc(b.id)}" class="contact"><div class="wrap reveal">
-            ${b.kicker ? `<div class="mono">${esc(b.kicker)}</div>` : ''}
-            ${b.title ? `<h2>${esc(b.title)}</h2>` : ''}
-            ${b.text ? `<p class="contact-text">${esc(b.text)}</p>` : ''}
-            ${mail}</div></section>`;
-        }
+        case 'classic':
+            return `<section id="${esc(b.id)}" class="${items.length ? '' : 'prose'}"><div class="wrap">${head(b)}
+            ${items.length ? `<div class="tools">${items.map(renderService).join('\n')}</div>` : ''}</div></section>`;
         default:
             return '';
     }
@@ -329,29 +331,36 @@ const CSS = `
         .badge-locked { color: var(--muted); border: 1px dashed var(--border) }
         .badge svg { width: 12px; height: 12px }
 
-        /* ── Outils ── */
+        /* ── Services (blocs classiques) ── */
         .tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px }
         .tool {
             flex: 0 1 250px; min-width: 0;
-            display: block; padding: 20px 22px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border);
+            display: flex; align-items: center; gap: 14px; padding: 20px 22px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border);
             text-decoration: none; transition: all .3s var(--ease);
         }
         a.tool:hover { border-color: rgba(139,92,246,.45); transform: translateY(-3px) }
-        .tool b { display: flex; justify-content: space-between; font-size: 1rem }
+        .tool > div { flex: 1; min-width: 0 }
+        .tool img { width: 40px; height: 40px; flex-shrink: 0 }
+        .tool b { display: flex; justify-content: space-between; font-size: 1rem; overflow-wrap: anywhere }
         .tool b span { color: var(--violet); transition: transform .3s var(--ease) }
         a.tool:hover b span { transform: translateX(4px) }
         div.tool b span { display: none }
         .tool small { display: block; margin-top: 4px; color: var(--muted); font-size: .85rem }
-        @media (max-width: 560px) { .realm, .tool { flex-basis: 100% } }
-
-        /* ── Contact / pied ── */
-        .contact { text-align: center }
-        .contact-text { margin: 0 auto 10px; max-width: 560px; color: var(--muted); white-space: pre-line }
-        .contact a.mail {
-            display: inline-block; margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: clamp(1rem, 3.5vw, 1.35rem);
-            color: var(--lilac); text-decoration: none; border-bottom: 1px solid rgba(200,162,255,.35); padding-bottom: 2px;
+        /* Téléphone : royaumes en 2 colonnes compactes (la dernière porte seule reste centrée) */
+        @media (max-width: 560px) {
+            section { padding: 52px 0 }
+            .head { margin-bottom: 28px }
+            .realms { gap: 10px }
+            .realm { flex-basis: calc(50% - 5px); padding: 18px 12px 16px; border-radius: 14px }
+            .realm img { width: 84px; height: 84px; margin-bottom: 12px }
+            .realm h3 { font-size: 1.05rem }
+            .realm .mono { font-size: .56rem; letter-spacing: .12em }
+            .realm p { font-size: .78rem; line-height: 1.45; margin: 8px 0 12px }
+            .badge { font-size: .62rem; padding: 5px 10px }
+            .tool { flex-basis: 100% }
         }
-        .contact a.mail:hover { border-color: var(--lilac) }
+
+        /* ── Pied ── */
         footer { border-top: 1px solid var(--border); padding: 26px 0 34px; text-align: center }
         footer a { color: var(--muted); text-decoration: none } footer a:hover { color: var(--lilac) }
 
