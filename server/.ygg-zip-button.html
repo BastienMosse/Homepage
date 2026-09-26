@@ -1,7 +1,6 @@
-<!-- Bouton « Zip » pour Yggdrasil (OpenList).
+<!-- Téléchargement en zip pour Yggdrasil (OpenList).
      À coller dans OpenList : Gestion → Paramètres → Global → « Customize body » (clé customize_body).
-     - Rien de coché : « Zip de ce dossier » ; éléments cochés (classe .selected d'OpenList) : « Zip de la sélection (N) »
-     - Envoie token + chemin (+ noms cochés) en POST (formulaire caché, rien dans l'URL) à /ygg-zip, que Traefik
+     - Envoie token + dossier affiché (+ noms visés) en POST (formulaire caché, rien dans l'URL) à /ygg-zip, que Traefik
        (ygg-zip.yaml) route vers le serveur Asgard (server/ygg-zip.cjs).
      - Réponse 421 (connexion HTTP/2 d'un autre sous-domaine réutilisée par le navigateur) : renvoi automatique.
      - Menus de téléchargement d'OpenList (nuage de la barre de sélection, clic droit) :
@@ -11,19 +10,11 @@
        dans le navigateur) casse au bout d'~30 s sous Firefox : il n'est plus proposé. -->
 <script>
 (() => {
-    const btn = document.createElement('button');
-    btn.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:9999;display:none;padding:10px 16px;'
-        + 'border-radius:999px;border:1px solid rgba(139,92,246,.55);background:#1b1430;color:#e9ddff;'
-        + 'font:600 14px system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 24px rgba(109,40,217,.35)';
-
     // Les erreurs (non connecté, 421…) arrivent dans cette iframe ; un zip, lui, part en téléchargement
     const frame = document.createElement('iframe');
     frame.name = 'ygg-zip-frame';
     frame.style.display = 'none';
 
-    let current = null;   // dossier affiché
-    let isDir = false;
-    let busy = false;
     let lastRequest = null;
     let retries = 0;
 
@@ -34,47 +25,12 @@
         try { return decodeURIComponent(last); } catch (e) { return last; }
     }
 
-    // Noms des éléments cochés (OpenList ajoute la classe « selected »)
-    function selection() {
-        return [...document.querySelectorAll('.viselect-item.selected')].map(itemName).filter(Boolean);
-    }
-
     // Dossier ? En liste, OpenList affiche « - » comme taille ; sinon on regarde l'icône dossier
     function isFolder(el) {
         const size = el.querySelector('.size');
         if (size) return size.textContent.trim() === '-';
         const icon = el.querySelector('svg path');
         return !!icon && /^M496 152a56 56/.test(icon.getAttribute('d') || '');
-    }
-
-    function render() {
-        if (!isDir) { btn.style.display = 'none'; return; }
-        btn.style.display = '';
-        if (busy) return;
-        const n = selection().length;
-        btn.textContent = n ? `⬇ Zip de la sélection (${n})` : '⬇ Zip de ce dossier';
-        btn.title = n ? 'Télécharger les éléments cochés en un .zip' : 'Télécharger tout ce dossier en .zip';
-    }
-
-    async function check() {
-        const path = decodeURIComponent(location.pathname);
-        if (path !== current) {
-            current = path;
-            isDir = false;
-            const token = localStorage.getItem('token');
-            if (token && !path.startsWith('/@')) {
-                try {
-                    const r = await fetch('/api/fs/get', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: token },
-                        body: JSON.stringify({ path, password: '' }),
-                    });
-                    const d = await r.json();
-                    isDir = d.code === 200 && !!(d.data && d.data.is_dir);
-                } catch (e) { isDir = false; }
-            }
-        }
-        render();
     }
 
     function send(fields) {
@@ -99,23 +55,15 @@
         let msg = '';
         try { msg = (frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.textContent || '').trim(); } catch (e) { /* rien */ }
         if (/misdirected/i.test(msg) && lastRequest && retries < 2) { retries++; send(lastRequest); return; }
-        busy = false;
         if (msg) alert(msg);
-        render();
     });
 
     function zip(names) {
-        lastRequest = [['token', localStorage.getItem('token') || ''], ['path', current || '/']];
+        lastRequest = [['token', localStorage.getItem('token') || ''], ['path', decodeURIComponent(location.pathname) || '/']];
         if (names.length) lastRequest.push(['names', JSON.stringify(names)]);
         retries = 0;
-        busy = true;
-        btn.textContent = '⏳ Préparation du zip…';
         send(lastRequest);
-        // Un téléchargement réussi ne déclenche pas « load » : on rend la main au bout de quelques secondes
-        setTimeout(() => { busy = false; render(); }, 6000);
     }
-
-    btn.addEventListener('click', () => zip(selection()));
 
     // --- Menus de téléchargement d'OpenList ---
     // Le zip natif (« Package Download », clic droit → Download sur un dossier) est fabriqué dans le
@@ -124,7 +72,7 @@
 
     const HIDDEN = ['Batch Download', 'Playlist Download', 'Send to Aria2'];
 
-    // Ce qu'un téléchargement viserait : les cochés, ou l'élément sous le clic droit
+    // Ce qu'un téléchargement viserait : les cochés (classe « selected » d'OpenList), ou l'élément sous le clic droit
     function target(fromContext) {
         const sel = [...document.querySelectorAll('.viselect-item.selected')];
         const els = fromContext && contextItem && !(contextItem.classList.contains('selected') && sel.length > 1) ? [contextItem] : sel;
@@ -228,8 +176,5 @@
     }, true);
 
     document.body.appendChild(frame);
-    document.body.appendChild(btn);
-    setInterval(check, 500);
-    check();
 })();
 </script>
