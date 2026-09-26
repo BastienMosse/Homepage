@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { DEFAULT_VITRINE, normalizeVitrine, renderVitrine } = require('./vitrine.cjs');
+const { handleZip } = require('./ygg-zip.cjs');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
@@ -14,6 +15,11 @@ const PROC_DIR = process.env.PROC_DIR || '/host/proc';
 const LAYOUT_FILE = process.env.LAYOUT_FILE || path.join(DATA_DIR, 'layout.json');
 // À côté de layout.json (/app/runtime en prod) pour survivre aux redeploys
 const VITRINE_FILE = process.env.VITRINE_FILE || path.join(path.dirname(LAYOUT_FILE), 'vitrine.json');
+
+// Yggdrasil (OpenList) : UUID Coolify du conteneur, dont le nom change à chaque redéploiement.
+// YGG_URL (ex. http://localhost:5244) court-circuite la recherche, pour les tests.
+const YGG_CONTAINER = process.env.YGG_CONTAINER || 'xu4pjawjk6lktnryrvrny6k9';
+const YGG_URL = process.env.YGG_URL || '';
 
 const COOKIE_NAME = 'lab_admin';
 const COOKIE_MAX_AGE = 86400 * 7;
@@ -201,6 +207,21 @@ function extractUrl(labels) {
         }
     }
     return '';
+}
+
+// Adresse interne d'OpenList sur le réseau coolify (mise en cache 1 min)
+let yggBase = { url: '', at: 0 };
+
+async function resolveYggBase() {
+    if (YGG_URL) return YGG_URL;
+    if (yggBase.url && Date.now() - yggBase.at < 60000) return yggBase.url;
+    const containers = await dockerRequest('GET', '/containers/json');
+    const c = (Array.isArray(containers) ? containers : [])
+        .find(x => (x.Names || []).some(n => n.replace(/^\//, '').startsWith(YGG_CONTAINER)));
+    const ip = c?.NetworkSettings?.Networks?.coolify?.IPAddress;
+    if (!ip) throw Object.assign(new Error('Yggdrasil introuvable'), { status: 503 });
+    yggBase = { url: `http://${ip}:5244`, at: Date.now() };
+    return yggBase.url;
 }
 
 // --- Discovery ---
@@ -638,6 +659,13 @@ const server = http.createServer(async (req, res) => {
         } catch (e) {
             json(res, 500, { error: e.message });
         }
+        return;
+    }
+
+    // Zip de dossier Yggdrasil (bouton injecté dans OpenList, route Traefik ygg-zip.yaml)
+    if (url === '/ygg-zip' && req.method === 'POST') {
+        const form = Object.fromEntries(new URLSearchParams(await parseBody(req, 262144)));
+        await handleZip(req, res, { form, resolveBase: resolveYggBase });
         return;
     }
 

@@ -1,0 +1,72 @@
+<!-- Bouton « Zip de ce dossier » pour Yggdrasil (OpenList).
+     À coller dans OpenList : Gestion → Paramètres → Global → « Customize body » (clé customize_body).
+     Envoie token + chemin en POST (formulaire caché, rien dans l'URL) à /ygg-zip, que Traefik
+     (ygg-zip.yaml) route vers le serveur Asgard (server/ygg-zip.cjs). -->
+<script>
+(() => {
+    const LABEL = '⬇ Zip de ce dossier';
+    const btn = document.createElement('button');
+    btn.textContent = LABEL;
+    btn.title = 'Télécharger ce dossier en .zip (fabriqué par le serveur, tient sur les gros dossiers)';
+    btn.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:9999;display:none;padding:10px 16px;'
+        + 'border-radius:999px;border:1px solid rgba(139,92,246,.55);background:#1b1430;color:#e9ddff;'
+        + 'font:600 14px system-ui,sans-serif;cursor:pointer;box-shadow:0 6px 24px rgba(109,40,217,.35)';
+
+    // Les erreurs (dossier vide, non connecté…) arrivent dans cette iframe ; un zip, lui, part en téléchargement
+    const frame = document.createElement('iframe');
+    frame.name = 'ygg-zip-frame';
+    frame.style.display = 'none';
+    frame.addEventListener('load', () => {
+        try {
+            const msg = frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.textContent;
+            if (msg) alert(msg);
+        } catch (e) { /* rien */ }
+        btn.textContent = LABEL;
+    });
+
+    let current = null;
+    async function check() {
+        const path = decodeURIComponent(location.pathname);
+        if (path === current) return;
+        current = path;
+        const token = localStorage.getItem('token');
+        if (!token || path.startsWith('/@')) { btn.style.display = 'none'; return; }
+        try {
+            const r = await fetch('/api/fs/get', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: token },
+                body: JSON.stringify({ path, password: '' }),
+            });
+            const d = await r.json();
+            btn.style.display = d.code === 200 && d.data && d.data.is_dir ? '' : 'none';
+        } catch (e) {
+            btn.style.display = 'none';
+        }
+    }
+
+    btn.addEventListener('click', () => {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/ygg-zip';
+        form.target = 'ygg-zip-frame';
+        form.style.display = 'none';
+        for (const [k, v] of [['token', localStorage.getItem('token') || ''], ['path', current || '/']]) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = k;
+            input.value = v;
+            form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+        btn.textContent = '⏳ Préparation du zip…';
+        setTimeout(() => { btn.textContent = LABEL; }, 5000);
+    });
+
+    document.body.appendChild(frame);
+    document.body.appendChild(btn);
+    setInterval(check, 800);
+    check();
+})();
+</script>
