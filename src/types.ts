@@ -82,3 +82,42 @@ export interface HealthCheck {
     ms: number;
     error?: string;
 }
+
+// --- Hermod : envois de mails d'accès programmés (server/hermod.cjs) ---
+
+export type HermodStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'cancelled';
+
+export interface HermodJob {
+    id: string;
+    status: HermodStatus;
+    createdAt: number;
+    sendAt: number;
+    prenom: string;
+    email: string;
+    service: string;
+    url: string;
+    identifiant: string;
+    duration: string;
+    subject: string;
+    batch?: string;
+    hasPassword: boolean;
+    sentAt?: number;
+    whisperExpiresAt?: number;
+    sentFolder?: string;
+    attempts?: number;
+    error?: string;
+    warning?: string;
+}
+
+export interface HermodDraft {
+    prenom: string;
+    email: string;
+    service: string;
+    url: string;
+    identifiant: string;
+    password: string;
+    duration: string;
+    subject: string;
+    sendAt: number;
+    batch?: string;
+}

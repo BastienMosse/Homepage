@@ -4,13 +4,15 @@ import BotMonitor from './components/BotMonitor.tsx';
 import LayoutEditor from './components/LayoutEditor.tsx';
 import VitrineEditor from './components/VitrineEditor.tsx';
 import ServerPanel from './components/ServerPanel.tsx';
-import { Activity, LogOut, Bot, Settings, PanelsTopLeft } from 'lucide-react';
+import HermodPanel from './components/HermodPanel.tsx';
+import { Activity, LogOut, Bot, Settings, PanelsTopLeft, Mail } from 'lucide-react';
 
-type Page = 'server' | 'vitrine' | 'layout' | 'bots';
+type Page = 'server' | 'vitrine' | 'hermod' | 'layout' | 'bots';
 
 const NAV: { id: Page; label: string; icon: typeof Activity }[] = [
     { id: 'server', label: 'Serveur', icon: Activity },
     { id: 'vitrine', label: 'Vitrine', icon: PanelsTopLeft },
+    { id: 'hermod', label: 'Hermod', icon: Mail },
     { id: 'layout', label: 'Services', icon: Settings },
     { id: 'bots', label: 'Bots', icon: Bot },
 ];
@@ -70,6 +72,11 @@ export default function App() {
             {page === 'server' && (
                 <div className="page">
                     <ServerPanel />
+                </div>
+            )}
+            {page === 'hermod' && (
+                <div className="page">
+                    <HermodPanel />
                 </div>
             )}
             {page === 'vitrine' && <VitrineEditor onBack={() => go('server')} />}

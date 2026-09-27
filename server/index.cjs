@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { DEFAULT_VITRINE, normalizeVitrine, renderVitrine } = require('./vitrine.cjs');
 const { handleZip } = require('./ygg-zip.cjs');
+const hermod = require('./hermod.cjs');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
@@ -15,6 +16,8 @@ const PROC_DIR = process.env.PROC_DIR || '/host/proc';
 const LAYOUT_FILE = process.env.LAYOUT_FILE || path.join(DATA_DIR, 'layout.json');
 // À côté de layout.json (/app/runtime en prod) pour survivre aux redeploys
 const VITRINE_FILE = process.env.VITRINE_FILE || path.join(path.dirname(LAYOUT_FILE), 'vitrine.json');
+// Envois programmés d'Hermod (contient les mots de passe en attente, chiffrés)
+const HERMOD_FILE = process.env.HERMOD_FILE || path.join(path.dirname(LAYOUT_FILE), 'hermod.json');
 
 // Yggdrasil (OpenList) : UUID Coolify du conteneur, dont le nom change à chaque redéploiement.
 // YGG_URL (ex. http://localhost:5244) court-circuite la recherche, pour les tests.
@@ -558,6 +561,43 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if (url === '/api/admin/hermod' && req.method === 'GET') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        json(res, 200, {
+            jobs: hermod.list(),
+            durations: hermod.DURATIONS,
+            sender: process.env.HERMOD_SMTP_USER || 'no-reply@lucipher-lab.fr',
+            configured: !!process.env.HERMOD_SMTP_PASS,
+        });
+        return;
+    }
+
+    if (url === '/api/admin/hermod/jobs' && req.method === 'POST') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        let data;
+        try { data = JSON.parse(await parseBody(req, 262144)); } catch { return json(res, 400, { error: 'JSON invalide' }); }
+        try { json(res, 200, { jobs: hermod.create(data.jobs || data) }); }
+        catch (e) { json(res, e.status || 500, { error: e.message }); }
+        return;
+    }
+
+    const hermodAction = url.match(/^\/api\/admin\/hermod\/jobs\/([a-f0-9]+)\/(cancel|send-now|retry|delete)$/);
+    if (hermodAction && req.method === 'POST') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        try { json(res, 200, { job: hermod.action(hermodAction[1], hermodAction[2]) }); }
+        catch (e) { json(res, e.status || 500, { error: e.message }); }
+        return;
+    }
+
+    if (url === '/api/admin/hermod/preview' && req.method === 'POST') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        let data;
+        try { data = JSON.parse(await parseBody(req, 65536)); } catch { data = {}; }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(hermod.preview(data));
+        return;
+    }
+
     if (url === '/api/admin/bots') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
         const layout = loadLayout();
@@ -710,12 +750,16 @@ const server = http.createServer(async (req, res) => {
     });
 });
 
+try { hermod.start(HERMOD_FILE); }
+catch (e) { console.error('Hermod désactivé :', e.message); }
+
 server.listen(PORT, () => {
     console.log(`Dashboard on port ${PORT}`);
     if (ADMIN_TOKEN) console.log('Admin auth enabled');
     else console.log('Warning: ADMIN_TOKEN not set, admin disabled');
     console.log(`Layout file: ${LAYOUT_FILE}`);
     console.log(`Vitrine file: ${VITRINE_FILE}`);
+    console.log(`Hermod file: ${HERMOD_FILE}`);
 });
 
 process.on('SIGTERM', () => { clearInterval(cpuInterval); server.close(); });
