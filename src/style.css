@@ -1787,3 +1787,19 @@ body.ve-grabbing, body.ve-grabbing * { cursor: grabbing !important; user-select:
     }
     .hm-user-row > .le-icon-btn { position: absolute; top: 10px; right: 8px; }
 }
+.hm-summary-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 4px 2px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: .74rem;
+    cursor: pointer;
+    transition: color .2s ease;
+}
+.hm-summary-toggle:hover { color: #a99bf7; }
+.hm-summary-toggle + .hm-summary { margin-top: 6px; }

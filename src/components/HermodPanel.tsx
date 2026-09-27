@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { HermodJob, HermodInfo, HermodStatus, HermodTemplate, HermodField } from '../types.ts';
 import {
-    Mail, Clock, Send, X, Trash2, RotateCw, Upload, AlertTriangle, CheckCircle2, FileText, Plus, Pencil, Copy, Lock, Eye, EyeOff, Users,
+    Mail, Clock, Send, X, Trash2, RotateCw, Upload, AlertTriangle, CheckCircle2, FileText, Plus, Pencil, Copy, Lock, Eye, EyeOff, Users, Info,
 } from 'lucide-react';
 
 const TZ = 'Europe/Paris';
@@ -64,6 +64,16 @@ export default function HermodPanel() {
     const [subject, setSubject] = useState('');
     const [rows, setRows] = useState<Recipient[]>([emptyRow()]);
     const [reveal, setReveal] = useState(false);
+    // Récapitulatif de l'envoi : masqué par défaut, choix mémorisé dans ce navigateur
+    const [showSummary, setShowSummary] = useState(() => {
+        try { return localStorage.getItem('hermod-summary') === '1'; } catch { return false; }
+    });
+    function toggleSummary() {
+        setShowSummary(v => {
+            try { localStorage.setItem('hermod-summary', v ? '0' : '1'); } catch { /* stockage indisponible */ }
+            return !v;
+        });
+    }
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
@@ -214,7 +224,10 @@ export default function HermodPanel() {
                         )}
                     </div>
                     <HField label="Objet" value={subject} onChange={setSubject} />
-                    {Number.isFinite(sendAt) && (
+                    <button className="hm-summary-toggle" onClick={toggleSummary} aria-expanded={showSummary}>
+                        <Info size={12} /> {showSummary ? "Masquer les détails de l'envoi" : "Détails de l'envoi"}
+                    </button>
+                    {showSummary && Number.isFinite(sendAt) && (
                         <div className="hm-summary">
                             <div><Send size={13} /><span>Envoi le <b>{fmtLong(sendAt)}</b> <span className="hm-dim">({relative(sendAt)})</span></span></div>
                             {hasWhisper && (
