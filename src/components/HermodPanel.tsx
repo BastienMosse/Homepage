@@ -9,6 +9,11 @@ const STATUS: Record<HermodStatus, string> = { pending: 'Programmé', sending: '
 const DURATION_MIN: Record<string, number> = { '5m': 5, '30m': 30, '1h': 60, '24h': 1440, '7d': 10080 };
 const VAR_RE = /\{\{\s*([A-Z0-9_]+)\s*\}\}/g;
 
+// « lundi 28 septembre à 10:00 »
+const fmtLong = (ms: number) => new Date(ms).toLocaleString('fr-FR', {
+    timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+}).replace(/ (?:à )?(\d{2}:\d{2})$/, ' à $1'); // selon le navigateur, le « à » est déjà là ou non
+
 const fmt = (ms: number) => new Date(ms).toLocaleString('fr-FR', {
     timeZone: TZ, weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
 });
@@ -210,10 +215,16 @@ export default function HermodPanel() {
                     </div>
                     <HField label="Objet" value={subject} onChange={setSubject} />
                     {Number.isFinite(sendAt) && (
-                        <p className="le-hint" style={{ marginTop: 6 }}>
-                            Envoi {fmt(sendAt)} ({relative(sendAt)})
-                            {hasWhisper && <> → lien créé à l'envoi, valable jusqu'au {fmt(sendAt + DURATION_MIN[duration] * 60000)}</>}
-                        </p>
+                        <div className="hm-summary">
+                            <div><Send size={13} /><span>Envoi le <b>{fmtLong(sendAt)}</b> <span className="hm-dim">({relative(sendAt)})</span></span></div>
+                            {hasWhisper && (
+                                <div><Lock size={13} /><span>
+                                    Chaque mot de passe devient un lien Whisper à usage unique, créé au moment de l'envoi
+                                    et valable jusqu'au <b>{fmtLong(sendAt + DURATION_MIN[duration] * 60000)}</b>.
+                                </span></div>
+                            )}
+                            <div><Mail size={13} /><span>Depuis <b>{from}</b>, une copie est rangée dans ses « Envoyés ».</span></div>
+                        </div>
                     )}
                 </div>
 
@@ -227,38 +238,31 @@ export default function HermodPanel() {
                             </button>
                         )}
                     </div>
-                    <div className="hm-table-wrap">
-                        <table className="hm-table hm-edit">
-                            <thead>
-                                <tr>
-                                    {columns.map(([n, f]) => <th key={n} title={n === '@email' ? '' : `{{${n}}}`}>{f.type === 'whisper' && <Lock size={10} />} {f.label}</th>)}
-                                    <th />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((r, i) => {
-                                    const touched = r.email.trim() || Object.values(r.values).some(v => v.trim());
-                                    return (
-                                        <tr key={i} className={touched && !rowOk(r) ? 'hm-bad' : ''}>
-                                            {columns.map(([n, f]) => (
-                                                <td key={n}>
-                                                    <input
-                                                        type={n === '@email' ? 'email' : f.type === 'whisper' && !reveal ? 'password' : 'text'}
-                                                        autoComplete={f.type === 'whisper' ? 'new-password' : 'off'}
-                                                        value={n === '@email' ? r.email : r.values[n] || ''}
-                                                        placeholder={n === '@email' ? 'prenom@exemple.fr' : f.label}
-                                                        onChange={e => setCell(i, n, e.target.value)}
-                                                    />
-                                                </td>
-                                            ))}
-                                            <td className="hm-row-actions">
-                                                <button className="le-icon-btn" title="Retirer" onClick={() => setRows(rs => (rs.length > 1 ? rs.filter((_, j) => j !== i) : [emptyRow()]))}><X size={11} /></button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                    {/* Grille qui suit la largeur disponible (pas de défilement horizontal) ; en cartes sur petit écran */}
+                    <div className="hm-users" style={{ '--hm-cols': columns.length } as React.CSSProperties}>
+                        <div className="hm-user-row hm-user-head">
+                            {columns.map(([n, f]) => <span key={n}>{f.type === 'whisper' && <Lock size={10} />} {f.label}</span>)}
+                            <span />
+                        </div>
+                        {rows.map((r, i) => {
+                            const touched = r.email.trim() || Object.values(r.values).some(v => v.trim());
+                            return (
+                                <div key={i} className={`hm-user-row ${touched && !rowOk(r) ? 'hm-bad' : ''}`}>
+                                    {columns.map(([n, f]) => (
+                                        <input
+                                            key={n}
+                                            aria-label={f.label}
+                                            type={n === '@email' ? 'email' : f.type === 'whisper' && !reveal ? 'password' : 'text'}
+                                            autoComplete={f.type === 'whisper' ? 'new-password' : 'off'}
+                                            value={n === '@email' ? r.email : r.values[n] || ''}
+                                            placeholder={n === '@email' ? 'prenom@exemple.fr' : f.label}
+                                            onChange={e => setCell(i, n, e.target.value)}
+                                        />
+                                    ))}
+                                    <button className="le-icon-btn" title="Retirer" onClick={() => setRows(rs => (rs.length > 1 ? rs.filter((_, j) => j !== i) : [emptyRow()]))}><X size={11} /></button>
+                                </div>
+                            );
+                        })}
                     </div>
                     <button className="le-add-section" style={{ padding: 10, marginTop: 8 }} onClick={() => setRows(rs => [...rs, emptyRow()])}>
                         <Plus size={13} /> Ajouter un utilisateur

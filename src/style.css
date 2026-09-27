@@ -1725,3 +1725,65 @@ body.ve-grabbing, body.ve-grabbing * { cursor: grabbing !important; user-select:
 .hm-field-row .hm-dim { grid-column: 2 / 5; }
 .hm-card input[type=date], .hm-card input[type=time] { color-scheme: dark; }
 .hm-recipients-head .btn { flex: none; }
+/* Hermod : récapitulatif de l'envoi */
+.hm-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(124,108,240,0.2);
+    font-size: .82rem;
+    line-height: 1.5;
+}
+.hm-summary > div { display: flex; gap: 10px; align-items: flex-start; }
+.hm-summary > div > svg { flex-shrink: 0; margin-top: 3px; color: #a99bf7; }
+.hm-summary b { color: var(--text); font-weight: 600; }
+/* Hermod : lignes utilisateurs en grille (s'adapte à la largeur, jamais de barre de défilement) */
+.hm-users { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.hm-user-row {
+    display: grid;
+    grid-template-columns: repeat(var(--hm-cols), minmax(0, 1fr)) 28px;
+    gap: 6px;
+    align-items: center;
+}
+.hm-user-head span {
+    font-size: .66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-dim);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 2px;
+}
+.hm-user-row input {
+    width: 100%;
+    min-width: 0;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: .8rem;
+    outline: none;
+}
+.hm-user-row input:focus { border-color: rgba(124,108,240,0.4); }
+.hm-user-row.hm-bad input { border-color: rgba(226,104,95,0.35); }
+@media (max-width: 700px) {
+    .hm-user-head { display: none; }
+    .hm-user-row {
+        grid-template-columns: 1fr 1fr;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg);
+        position: relative;
+        padding-right: 40px;
+    }
+    .hm-user-row > .le-icon-btn { position: absolute; top: 10px; right: 8px; }
+}
