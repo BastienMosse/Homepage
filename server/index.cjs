@@ -715,11 +715,15 @@ const server = http.createServer(async (req, res) => {
 
     // --- Static files ---
 
+    // Pages HTML revérifiées à chaque visite (sinon le navigateur garde l'ancienne version après un
+    // déploiement) ; les fichiers de /assets/ ont un nom qui change à chaque build : cache long
+    const HTML_HEADERS = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' };
+
     // lucipher-lab.fr sert la vitrine publique, les autres domaines (asgard.) le portail
     const host = (req.headers.host || '').split(':')[0].toLowerCase();
     const isVitrine = VITRINE_HOSTS.includes(host);
     const sendVitrine = () => {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, HTML_HEADERS);
         res.end(renderVitrine(loadVitrine()));
     };
     if (isVitrine && url === '/') return sendVitrine();
@@ -734,13 +738,14 @@ const server = http.createServer(async (req, res) => {
             if (isVitrine) return sendVitrine();
             fs.readFile(path.join(DIST_DIR, 'index.html'), (e, html) => {
                 if (e) { res.writeHead(404); res.end('Not found'); return; }
-                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.writeHead(200, HTML_HEADERS);
                 res.end(html);
             });
             return;
         }
         const ext = path.extname(filePath).toLowerCase();
-        res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+        const cache = ext === '.html' ? 'no-cache' : url.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=3600';
+        res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cache });
         res.end(data);
     });
 });
