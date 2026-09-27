@@ -87,7 +87,7 @@ export interface HealthCheck {
 
 export type HermodStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'cancelled';
 
-export interface HermodField { label: string; type: 'text' | 'whisper'; }
+export interface HermodField { label: string; type: 'text' | 'whisper'; scope?: 'common' | 'recipient'; }
 
 export interface HermodTemplate {
     id: string;

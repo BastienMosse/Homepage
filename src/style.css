@@ -1720,3 +1720,8 @@ body.ve-grabbing, body.ve-grabbing * { cursor: grabbing !important; user-select:
 @media (max-width: 600px) {
     .hm-grid-3 { grid-template-columns: 1fr; }
 }
+.hm-card .hm-grid + .hm-grid { margin-top: 4px; }
+.hm-field-row { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.hm-field-row .hm-dim { grid-column: 2 / 5; }
+.hm-card input[type=date], .hm-card input[type=time] { color-scheme: dark; }
+.hm-recipients-head .btn { flex: none; }

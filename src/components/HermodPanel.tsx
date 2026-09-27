@@ -40,47 +40,23 @@ function tomorrowTen() {
 }
 
 const varsOf = (subject: string, html: string) => [...new Set([...`${subject}\n${html}`.matchAll(VAR_RE)].map(m => m[1]))];
-const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-// --- CSV (facultatif : pré-remplit le tableau) ---
-
-function parseCsv(text: string): string[][] {
-    const first = text.split(/\r?\n/)[0] || '';
-    const sep = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
-    const rows: string[][] = [];
-    let row: string[] = [];
-    let cell = '';
-    let quoted = false;
-    for (let i = 0; i < text.length; i++) {
-        const c = text[i];
-        if (quoted) {
-            if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-            else if (c === '"') quoted = false;
-            else cell += c;
-        } else if (c === '"') quoted = true;
-        else if (c === sep) { row.push(cell); cell = ''; }
-        else if (c === '\n' || c === '\r') {
-            if (c === '\r' && text[i + 1] === '\n') i++;
-            row.push(cell); cell = '';
-            if (row.some(x => x.trim())) rows.push(row);
-            row = [];
-        } else cell += c;
-    }
-    row.push(cell);
-    if (row.some(x => x.trim())) rows.push(row);
-    return rows;
-}
-
 interface Recipient { email: string; values: Record<string, string>; }
 const emptyRow = (): Recipient => ({ email: '', values: {} });
+
+// Date et heure saisies séparément (heure locale du navigateur, donc Paris)
+const dateOf = (ms: number) => toInput(ms).slice(0, 10);
+const timeOf = (ms: number) => toInput(ms).slice(11, 16);
+const combine = (date: string, time: string) => (date && time ? new Date(`${date}T${time}`).getTime() : NaN);
 
 export default function HermodPanel() {
     const [info, setInfo] = useState<HermodInfo | null>(null);
     const [from, setFrom] = useState('');
-    const [fromName, setFromName] = useState('');
     const [templateId, setTemplateId] = useState('');
-    const [sendAt, setSendAt] = useState(tomorrowTen());
+    const [common, setCommon] = useState<Record<string, string>>({});
+    const [date, setDate] = useState(dateOf(tomorrowTen()));
+    const [time, setTime] = useState('10:00');
     const [duration, setDuration] = useState('24h');
+    const [subject, setSubject] = useState('');
     const [rows, setRows] = useState<Recipient[]>([emptyRow()]);
     const [reveal, setReveal] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -89,13 +65,11 @@ export default function HermodPanel() {
     const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
     const [editing, setEditing] = useState<Partial<HermodTemplate> | null>(null);
     const [, setTick] = useState(0);
-    const fileRef = useRef<HTMLInputElement>(null);
 
     const load = useCallback(() => {
         fetch('/api/admin/hermod').then(r => r.json()).then((d: HermodInfo) => {
             setInfo(d);
             setFrom(f => f || d.senders[0] || '');
-            setFromName(n => n || d.fromName);
             setTemplateId(t => (t && d.templates.some(x => x.id === t) ? t : d.templates[0]?.id || ''));
         });
     }, []);
@@ -108,7 +82,13 @@ export default function HermodPanel() {
 
     const tpl = info?.templates.find(t => t.id === templateId);
     const fields = useMemo(() => Object.entries(tpl?.fields || {}) as [string, HermodField][], [tpl]);
+    const commonFields = fields.filter(([, f]) => f.scope === 'common');
+    const rowFields = fields.filter(([, f]) => f.scope !== 'common');
     const hasWhisper = fields.some(([, f]) => f.type === 'whisper');
+    const sendAt = combine(date, time);
+
+    // Changement de modèle : l'objet reprend celui du modèle
+    useEffect(() => { if (tpl) setSubject(tpl.subject); }, [tpl?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     async function post(url: string, body?: unknown) {
         const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -122,15 +102,16 @@ export default function HermodPanel() {
     }
 
     const filled = rows.filter(r => r.email.trim() || Object.values(r.values).some(v => v.trim()));
-    const rowOk = (r: Recipient) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim()) && fields.every(([n]) => (r.values[n] || '').trim());
-    const ready = !!tpl && !!from && Number.isFinite(sendAt) && filled.length > 0 && filled.every(rowOk);
+    const rowOk = (r: Recipient) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim()) && rowFields.every(([n]) => (r.values[n] || '').trim());
+    const commonOk = commonFields.every(([n]) => (common[n] || '').trim());
+    const ready = !!tpl && !!from && Number.isFinite(sendAt) && commonOk && subject.trim() && filled.length > 0 && filled.every(rowOk);
 
     async function schedule() {
         setSaving(true); setError(''); setNotice('');
         try {
             const d = await post('/api/admin/hermod/schedule', {
-                from, fromName, templateId, sendAt, duration,
-                batch: filled.length > 1 ? `${tpl?.name} · ${fmt(sendAt)}` : '',
+                from, templateId, sendAt, duration, subject, common,
+                batch: filled.length > 1 ? `${common.SERVICE || tpl?.name} · ${fmt(sendAt)}` : '',
                 recipients: filled.map(r => ({ email: r.email.trim(), values: r.values })),
             });
             setNotice(`${d.jobs.length} envoi${d.jobs.length > 1 ? 's' : ''} programmé${d.jobs.length > 1 ? 's' : ''} pour le ${fmt(sendAt)}.`);
@@ -152,35 +133,10 @@ export default function HermodPanel() {
         catch (e) { alert((e as Error).message); }
     }
 
-    async function showPreview(values?: Record<string, string>) {
-        const sample = values || filled[0]?.values || Object.fromEntries(fields.map(([n, f]) => [n, `[${f.label}]`]));
-        setPreview(await post('/api/admin/hermod/preview', { templateId, values: sample, duration, sendAt }));
-    }
-
-    // CSV facultatif : colonnes reconnues par nom de champ ou libellé (+ « email »)
-    function importCsv(file: File | undefined) {
-        if (!file) return;
-        file.text().then(text => {
-            const [header, ...lines] = parseCsv(text.replace(/^﻿/, ''));
-            const map = (header || []).map(h => {
-                const k = norm(h);
-                if (['email', 'mail', 'courriel', 'destinataire'].includes(k)) return '@email';
-                const hit = fields.find(([n, f]) => norm(n) === k || norm(f.label) === k);
-                return hit ? hit[0] : null;
-            });
-            if (!map.includes('@email')) { setError('CSV : colonne « email » introuvable.'); return; }
-            const imported = lines.map(cells => {
-                const r = emptyRow();
-                map.forEach((k, i) => {
-                    if (k === '@email') r.email = (cells[i] || '').trim();
-                    else if (k) r.values[k] = (cells[i] || '').trim();
-                });
-                return r;
-            });
-            setRows(rs => [...rs.filter(r => r.email.trim() || Object.values(r.values).some(v => v.trim())), ...imported]);
-            const unknown = (header || []).filter((_, i) => !map[i]);
-            setNotice(`${imported.length} destinataire(s) ajouté(s) depuis ${file.name}${unknown.length ? ` — colonnes ignorées : ${unknown.join(', ')}` : ''}.`);
-        });
+    async function showPreview() {
+        const row = filled[0]?.values || Object.fromEntries(rowFields.map(([n, f]) => [n, `[${f.label}]`]));
+        const values = { ...Object.fromEntries(commonFields.map(([n, f]) => [n, common[n] || `[${f.label}]`])), ...row };
+        setPreview(await post('/api/admin/hermod/preview', { templateId, subject, values, duration, sendAt }));
     }
 
     async function deleteTemplate(t: HermodTemplate) {
@@ -195,6 +151,11 @@ export default function HermodPanel() {
     const history = info.jobs.filter(j => j.status !== 'pending' && j.status !== 'sending')
         .sort((a, b) => (b.sentAt || b.sendAt) - (a.sentAt || a.sendAt));
 
+    // Colonnes des lignes : le 1er champ (Nom), puis l'email, puis les autres champs par destinataire
+    const columns: Array<[string, HermodField]> = rowFields.length
+        ? [rowFields[0], ['@email', { label: 'Email', type: 'text', scope: 'recipient' }], ...rowFields.slice(1)]
+        : [['@email', { label: 'Email', type: 'text', scope: 'recipient' }]];
+
     return (
         <>
             {!info.senders.length && (
@@ -204,66 +165,73 @@ export default function HermodPanel() {
                 </div>
             )}
 
-            {/* --- Nouvel envoi --- */}
+            {/* --- Envoi : partie commune --- */}
             <div className="section" style={{ animationDelay: '.05s' }}>
                 <div className="section-header"><Mail size={14} /> Nouvel envoi</div>
                 <div className="hm-card">
-                    <div className="hm-grid hm-grid-3">
+                    <div className="hm-grid">
                         <label className="ve-field">
                             <span className="le-label">Expéditeur</span>
                             <select value={from} onChange={e => setFrom(e.target.value)}>
                                 {info.senders.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </label>
-                        <HField label="Nom affiché" value={fromName} onChange={setFromName} />
                         <label className="ve-field">
                             <span className="le-label">Modèle</span>
                             <select value={templateId} onChange={e => setTemplateId(e.target.value)}>
                                 {info.templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                             </select>
                         </label>
+                        {commonFields.map(([n, f]) => (
+                            <label key={n} className="ve-field">
+                                <span className="le-label">{f.type === 'whisper' && <Lock size={10} />} {f.label}</span>
+                                <input type={f.type === 'whisper' && !reveal ? 'password' : 'text'} value={common[n] || ''}
+                                    onChange={e => setCommon(c => ({ ...c, [n]: e.target.value }))} />
+                            </label>
+                        ))}
+                    </div>
+                    <div className="hm-grid hm-grid-3">
                         <label className="ve-field">
-                            <span className="le-label">Envoi le (heure de Paris)</span>
-                            <input type="datetime-local" value={Number.isFinite(sendAt) ? toInput(sendAt) : ''} onChange={e => setSendAt(fromInput(e.target.value))} />
+                            <span className="le-label">Date d'envoi</span>
+                            <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                        </label>
+                        <label className="ve-field">
+                            <span className="le-label">Heure d'envoi (Paris)</span>
+                            <input type="time" value={time} onChange={e => setTime(e.target.value)} />
                         </label>
                         {hasWhisper && (
                             <label className="ve-field">
-                                <span className="le-label">Liens Whisper valables</span>
+                                <span className="le-label">Expiration du lien</span>
                                 <select value={duration} onChange={e => setDuration(e.target.value)}>
                                     {Object.entries(info.durations).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                 </select>
                             </label>
                         )}
                     </div>
+                    <HField label="Objet" value={subject} onChange={setSubject} />
                     {Number.isFinite(sendAt) && (
-                        <p className="le-hint" style={{ marginTop: 4 }}>
+                        <p className="le-hint" style={{ marginTop: 6 }}>
                             Envoi {fmt(sendAt)} ({relative(sendAt)})
-                            {hasWhisper && <> → liens Whisper créés à l'envoi, valables jusqu'au {fmt(sendAt + DURATION_MIN[duration] * 60000)}</>}
+                            {hasWhisper && <> → lien créé à l'envoi, valable jusqu'au {fmt(sendAt + DURATION_MIN[duration] * 60000)}</>}
                         </p>
                     )}
+                </div>
 
+                {/* --- Une ligne par utilisateur --- */}
+                <div className="hm-card">
                     <div className="hm-recipients-head">
-                        <span className="le-label" style={{ margin: 0 }}><Users size={11} /> Destinataires ({filled.length})</span>
-                        <div className="hm-inline-actions">
-                            {hasWhisper && (
-                                <button className="btn btn-ghost btn-sm" onClick={() => setReveal(v => !v)}>
-                                    {reveal ? <EyeOff size={12} /> : <Eye size={12} />} {reveal ? 'Masquer les secrets' : 'Afficher les secrets'}
-                                </button>
-                            )}
-                            <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()} title="Facultatif : pré-remplir depuis un CSV">
-                                <Upload size={12} /> CSV
+                        <span className="le-label" style={{ margin: 0 }}><Users size={11} /> Utilisateurs ({filled.length})</span>
+                        {rowFields.some(([, f]) => f.type === 'whisper') && (
+                            <button className="btn btn-ghost btn-sm" onClick={() => setReveal(v => !v)}>
+                                {reveal ? <EyeOff size={12} /> : <Eye size={12} />} {reveal ? 'Masquer' : 'Afficher'} les mots de passe
                             </button>
-                            <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={e => { importCsv(e.target.files?.[0]); e.target.value = ''; }} />
-                        </div>
+                        )}
                     </div>
                     <div className="hm-table-wrap">
                         <table className="hm-table hm-edit">
                             <thead>
                                 <tr>
-                                    <th>Email</th>
-                                    {fields.map(([n, f]) => (
-                                        <th key={n} title={`{{${n}}}`}>{f.type === 'whisper' && <Lock size={10} />} {f.label}</th>
-                                    ))}
+                                    {columns.map(([n, f]) => <th key={n} title={n === '@email' ? '' : `{{${n}}}`}>{f.type === 'whisper' && <Lock size={10} />} {f.label}</th>)}
                                     <th />
                                 </tr>
                             </thead>
@@ -272,21 +240,18 @@ export default function HermodPanel() {
                                     const touched = r.email.trim() || Object.values(r.values).some(v => v.trim());
                                     return (
                                         <tr key={i} className={touched && !rowOk(r) ? 'hm-bad' : ''}>
-                                            <td><input value={r.email} placeholder="prenom@exemple.fr" onChange={e => setCell(i, '@email', e.target.value)} /></td>
-                                            {fields.map(([n, f]) => (
+                                            {columns.map(([n, f]) => (
                                                 <td key={n}>
                                                     <input
-                                                        type={f.type === 'whisper' && !reveal ? 'password' : 'text'}
+                                                        type={n === '@email' ? 'email' : f.type === 'whisper' && !reveal ? 'password' : 'text'}
                                                         autoComplete={f.type === 'whisper' ? 'new-password' : 'off'}
-                                                        value={r.values[n] || ''}
-                                                        placeholder={f.type === 'whisper' ? 'secret → lien Whisper' : f.label}
+                                                        value={n === '@email' ? r.email : r.values[n] || ''}
+                                                        placeholder={n === '@email' ? 'prenom@exemple.fr' : f.label}
                                                         onChange={e => setCell(i, n, e.target.value)}
                                                     />
                                                 </td>
                                             ))}
                                             <td className="hm-row-actions">
-                                                <button className="le-icon-btn" title="Aperçu pour ce destinataire" onClick={() => showPreview(r.values)}><FileText size={11} /></button>
-                                                <button className="le-icon-btn" title="Dupliquer la ligne" onClick={() => setRows(rs => [...rs.slice(0, i + 1), { email: '', values: { ...r.values } }, ...rs.slice(i + 1)])}><Copy size={11} /></button>
                                                 <button className="le-icon-btn" title="Retirer" onClick={() => setRows(rs => (rs.length > 1 ? rs.filter((_, j) => j !== i) : [emptyRow()]))}><X size={11} /></button>
                                             </td>
                                         </tr>
@@ -296,19 +261,15 @@ export default function HermodPanel() {
                         </table>
                     </div>
                     <button className="le-add-section" style={{ padding: 10, marginTop: 8 }} onClick={() => setRows(rs => [...rs, emptyRow()])}>
-                        <Plus size={13} /> Ajouter un destinataire
+                        <Plus size={13} /> Ajouter un utilisateur
                     </button>
-                    <p className="le-hint" style={{ marginTop: 6 }}>
-                        Colonnes = champs du modèle. <Lock size={9} /> = secret : la valeur n'apparaît pas dans le mail, elle devient un lien Whisper
-                        à lecture unique. Rempli automatiquement : {Object.keys(info.autoVars).map(v => `{{${v}}}`).join(', ')}.
-                    </p>
 
                     {error && <p className="le-error" style={{ marginTop: 8 }}>{error}</p>}
                     {notice && <p className="hm-ok"><CheckCircle2 size={12} /> {notice}</p>}
                     <div className="hm-actions">
-                        <button className="btn btn-ghost btn-sm" onClick={() => showPreview()}><FileText size={12} /> Aperçu</button>
+                        <button className="btn btn-ghost btn-sm" onClick={showPreview}><FileText size={12} /> Aperçu</button>
                         <button className="btn btn-primary btn-sm" disabled={!ready || saving} onClick={schedule}>
-                            <Clock size={12} /> {saving ? '…' : `Programmer ${filled.length || ''} envoi${filled.length > 1 ? 's' : ''}`}
+                            <Clock size={12} /> {saving ? '…' : filled.length ? `Programmer ${filled.length} envoi${filled.length > 1 ? 's' : ''}` : 'Programmer'}
                         </button>
                     </div>
                 </div>
@@ -330,7 +291,8 @@ export default function HermodPanel() {
                                     {t.vars.map(v => {
                                         const f = t.fields[v];
                                         return <span key={v} className={`hm-chip ${f?.type === 'whisper' ? 'hm-chip-secret' : ''} ${info.autoVars[v] ? 'hm-chip-auto' : ''}`}>
-                                            {f?.type === 'whisper' && <Lock size={9} />} {f?.label || v}{info.autoVars[v] ? ' (auto)' : ''}
+                                            {f?.type === 'whisper' && <Lock size={9} />} {f?.label || v}
+                                            {info.autoVars[v] ? ' (auto)' : f?.scope === 'common' ? ' (commun)' : ''}
                                         </span>;
                                     })}
                                 </div>
@@ -363,7 +325,7 @@ export default function HermodPanel() {
                 <div className="modal-overlay" onClick={() => setPreview(null)}>
                     <div className="hm-preview" onClick={e => e.stopPropagation()}>
                         <div className="hm-preview-bar">
-                            <span>Objet : <b>{preview.subject}</b> <span className="hm-dim">(liens Whisper factices)</span></span>
+                            <span>Objet : <b>{preview.subject}</b> <span className="hm-dim">(lien Whisper factice)</span></span>
                             <button className="le-icon-btn" onClick={() => setPreview(null)}><X size={12} /></button>
                         </div>
                         <iframe title="Aperçu du mail" sandbox="" srcDoc={preview.html} />
@@ -411,7 +373,7 @@ function TemplateEditor({ initial, autoVars, onClose, onSaved, post }: {
 
     const vars = varsOf(subject, html);
     const editable = vars.filter(v => !autoVars[v]);
-    const effective = Object.fromEntries(editable.map(v => [v, fields[v] || { label: v.charAt(0) + v.slice(1).toLowerCase().replace(/_/g, ' '), type: 'text' as const }]));
+    const effective = Object.fromEntries(editable.map(v => [v, fields[v] || { label: v.charAt(0) + v.slice(1).toLowerCase().replace(/_/g, ' '), type: 'text' as const, scope: 'recipient' as const }]));
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -466,6 +428,10 @@ function TemplateEditor({ initial, autoVars, onClose, onSaved, post }: {
                                     <select value={effective[v].type} onChange={e => setFields(f => ({ ...f, [v]: { ...effective[v], type: e.target.value as HermodField['type'] } }))}>
                                         <option value="text">Texte</option>
                                         <option value="whisper">Secret → lien Whisper</option>
+                                    </select>
+                                    <select value={effective[v].scope || 'recipient'} onChange={e => setFields(f => ({ ...f, [v]: { ...effective[v], scope: e.target.value as HermodField['scope'] } }))}>
+                                        <option value="recipient">Par utilisateur</option>
+                                        <option value="common">Commun à l'envoi</option>
                                     </select>
                                 </div>
                             ))}

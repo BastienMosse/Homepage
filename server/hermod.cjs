@@ -75,6 +75,15 @@ function varsOf(tpl) {
     return [...names];
 }
 
+// Champs du mail d'accès. scope « common » = saisi une fois pour tout l'envoi, « recipient » = une valeur par ligne
+const ACCES_FIELDS = {
+    SERVICE: { label: 'Service concerné', type: 'text', scope: 'common' },
+    URL: { label: 'Adresse du service', type: 'text', scope: 'common' },
+    PRENOM: { label: 'Nom', type: 'text', scope: 'recipient' },
+    IDENTIFIANT: { label: 'Identifiant', type: 'text', scope: 'recipient' },
+    LIEN_WHISPER: { label: 'Mot de passe', type: 'whisper', scope: 'recipient' },
+};
+
 // Modèle d'origine : le mail d'accès (branding/templates/acces.min.html)
 function seedTemplate() {
     return {
@@ -82,13 +91,7 @@ function seedTemplate() {
         name: "Accès à un service (mot de passe via Whisper)",
         subject: 'Vos accès à {{SERVICE}}',
         html: fs.readFileSync(path.join(__dirname, 'templates', 'acces.html'), 'utf8'),
-        fields: {
-            PRENOM: { label: 'Prénom', type: 'text' },
-            SERVICE: { label: 'Service', type: 'text' },
-            URL: { label: 'Adresse du service', type: 'text' },
-            IDENTIFIANT: { label: 'Identifiant', type: 'text' },
-            LIEN_WHISPER: { label: 'Mot de passe', type: 'whisper' },
-        },
+        fields: JSON.parse(JSON.stringify(ACCES_FIELDS)),
         updatedAt: Date.now(),
     };
 }
@@ -98,6 +101,14 @@ function load(filePath) {
     try { state = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { state = {}; }
     if (!Array.isArray(state.jobs)) state.jobs = [];
     if (!Array.isArray(state.templates) || !state.templates.length) state.templates = [seedTemplate()];
+    // Modèles d'avant la notion de portée : tout est « par destinataire », sauf le mail d'accès d'origine
+    for (const t of state.templates) {
+        for (const [name, f] of Object.entries(t.fields || {})) {
+            if (f.scope) continue;
+            if (t.id === 'acces' && ACCES_FIELDS[name]) Object.assign(f, ACCES_FIELDS[name]);
+            else f.scope = 'recipient';
+        }
+    }
     for (const j of state.jobs) {
         // Arrêt pendant un envoi : on ne sait pas si le mail est parti, on ne renvoie pas tout seul
         if (j.status === 'sending') {
@@ -139,7 +150,11 @@ function saveTemplate(input) {
     for (const v of varsOf({ subject, html })) {
         if (AUTO_VARS[v]) continue;
         const f = (o.fields && o.fields[v]) || {};
-        fields[v] = { label: String(f.label || v).slice(0, 80), type: f.type === 'whisper' ? 'whisper' : 'text' };
+        fields[v] = {
+            label: String(f.label || v).slice(0, 80),
+            type: f.type === 'whisper' ? 'whisper' : 'text',
+            scope: f.scope === 'common' ? 'common' : 'recipient',
+        };
     }
     const existing = o.id && state.templates.find(t => t.id === o.id);
     const tpl = { id: existing ? existing.id : crypto.randomBytes(6).toString('hex'), name, subject, html, fields, updatedAt: Date.now() };
@@ -165,7 +180,8 @@ function publicJob(j) {
     return { ...rest, hasSecrets: !!(secrets || secret) };
 }
 
-// input : { from, fromName, templateId, sendAt, duration, batch, recipients: [{ email, values: { VAR: valeur } }] }
+// input : { from, fromName, templateId, sendAt, duration, subject?, batch,
+//          common: { VAR: valeur } (champs « commun »), recipients: [{ email, values: { VAR: valeur } }] }
 function schedule(input) {
     const o = input && typeof input === 'object' ? input : {};
     const acc = accounts();
@@ -180,14 +196,24 @@ function schedule(input) {
     if (!recipients.length) throw httpError('aucun destinataire', 400);
     if (recipients.length > 500) throw httpError('500 destinataires maximum par envoi', 400);
 
+    const subject = String(o.subject || '').trim().slice(0, 300) || tpl.subject;
     const fields = Object.entries(tpl.fields || {});
+    const common = o.common && typeof o.common === 'object' ? o.common : {};
     const errors = [];
+    const missingCommon = fields.filter(([n, f]) => f.scope === 'common' && !String(common[n] || '').trim()).map(([, f]) => f.label);
+    if (missingCommon.length) errors.push(`à remplir : ${missingCommon.join(', ')}`);
     const jobs = recipients.map((r, i) => {
         const email = String(r.email || '').trim().toLowerCase();
         const values = {};
         const secrets = {};
         const missing = [];
         for (const [name, f] of fields) {
+            if (f.scope === 'common') {
+                const c = typeof common[name] === 'string' ? common[name] : '';
+                if (f.type === 'whisper') secrets[name] = c;
+                else values[name] = c.trim().slice(0, 2000);
+                continue;
+            }
             const v = typeof r.values?.[name] === 'string' ? r.values[name] : '';
             if (!v.trim()) missing.push(f.label);
             if (f.type === 'whisper') secrets[name] = v;
@@ -206,7 +232,7 @@ function schedule(input) {
             templateId: tpl.id,
             templateName: tpl.name,
             // Copie du modèle au moment de la programmation : le modifier ensuite ne change pas les envois prévus
-            subject: tpl.subject,
+            subject,
             html: tpl.html,
             to: email,
             values,
@@ -272,6 +298,7 @@ function htmlToText(html) {
         })
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/(p|div|tr|h[1-6]|li|table)>/gi, '\n')
+        .replace(/<\/(td|th)>/gi, ' ')
         .replace(/<[^>]+>/g, '')
         .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
         .replace(/[ \t]+/g, ' ')
