@@ -561,41 +561,36 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    if (url === '/api/admin/hermod' && req.method === 'GET') {
+    // --- Hermod (mails programmés) ---
+    if (url.startsWith('/api/admin/hermod')) {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        json(res, 200, {
-            jobs: hermod.list(),
-            durations: hermod.DURATIONS,
-            sender: process.env.HERMOD_SMTP_USER || 'no-reply@lucipher-lab.fr',
-            configured: !!process.env.HERMOD_SMTP_PASS,
-        });
-        return;
-    }
-
-    if (url === '/api/admin/hermod/jobs' && req.method === 'POST') {
-        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        let data;
-        try { data = JSON.parse(await parseBody(req, 262144)); } catch { return json(res, 400, { error: 'JSON invalide' }); }
-        try { json(res, 200, { jobs: hermod.create(data.jobs || data) }); }
-        catch (e) { json(res, e.status || 500, { error: e.message }); }
-        return;
-    }
-
-    const hermodAction = url.match(/^\/api\/admin\/hermod\/jobs\/([a-f0-9]+)\/(cancel|send-now|retry|delete)$/);
-    if (hermodAction && req.method === 'POST') {
-        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        try { json(res, 200, { job: hermod.action(hermodAction[1], hermodAction[2]) }); }
-        catch (e) { json(res, e.status || 500, { error: e.message }); }
-        return;
-    }
-
-    if (url === '/api/admin/hermod/preview' && req.method === 'POST') {
-        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
-        let data;
-        try { data = JSON.parse(await parseBody(req, 65536)); } catch { data = {}; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(hermod.preview(data));
-        return;
+        const body = async () => { try { return JSON.parse(await parseBody(req, 1048576)); } catch { throw Object.assign(new Error('JSON invalide'), { status: 400 }); } };
+        try {
+            if (url === '/api/admin/hermod' && req.method === 'GET') {
+                return json(res, 200, { ...hermod.info(), jobs: hermod.listJobs(), templates: hermod.listTemplates() });
+            }
+            if (url === '/api/admin/hermod/schedule' && req.method === 'POST') {
+                return json(res, 200, { jobs: hermod.schedule(await body()) });
+            }
+            if (url === '/api/admin/hermod/templates' && req.method === 'POST') {
+                return json(res, 200, { template: hermod.saveTemplate(await body()) });
+            }
+            const tplDelete = url.match(/^\/api\/admin\/hermod\/templates\/([a-z0-9]+)\/delete$/);
+            if (tplDelete && req.method === 'POST') {
+                hermod.deleteTemplate(tplDelete[1]);
+                return json(res, 200, { ok: true });
+            }
+            const jobAction = url.match(/^\/api\/admin\/hermod\/jobs\/([a-f0-9]+)\/(cancel|send-now|retry|delete)$/);
+            if (jobAction && req.method === 'POST') {
+                return json(res, 200, { job: hermod.action(jobAction[1], jobAction[2]) });
+            }
+            if (url === '/api/admin/hermod/preview' && req.method === 'POST') {
+                return json(res, 200, hermod.preview(await body()));
+            }
+            return json(res, 404, { error: 'not_found' });
+        } catch (e) {
+            return json(res, e.status || 500, { error: e.message });
+        }
     }
 
     if (url === '/api/admin/bots') {

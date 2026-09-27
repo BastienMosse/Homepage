@@ -83,24 +83,38 @@ export interface HealthCheck {
     error?: string;
 }
 
-// --- Hermod : envois de mails d'accès programmés (server/hermod.cjs) ---
+// --- Hermod : envois de mails programmés (server/hermod.cjs) ---
 
 export type HermodStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'cancelled';
+
+export interface HermodField { label: string; type: 'text' | 'whisper'; }
+
+export interface HermodTemplate {
+    id: string;
+    name: string;
+    subject: string;
+    html: string;
+    fields: Record<string, HermodField>;
+    vars: string[];
+    updatedAt: number;
+}
 
 export interface HermodJob {
     id: string;
     status: HermodStatus;
     createdAt: number;
     sendAt: number;
-    prenom: string;
-    email: string;
-    service: string;
-    url: string;
-    identifiant: string;
     duration: string;
-    subject: string;
+    from: string;
+    fromName?: string;
+    templateId?: string;
+    templateName?: string;
+    subject?: string;
+    to: string;
+    values?: Record<string, string>;
+    secretFields?: string[];
     batch?: string;
-    hasPassword: boolean;
+    hasSecrets: boolean;
     sentAt?: number;
     whisperExpiresAt?: number;
     sentFolder?: string;
@@ -109,15 +123,11 @@ export interface HermodJob {
     warning?: string;
 }
 
-export interface HermodDraft {
-    prenom: string;
-    email: string;
-    service: string;
-    url: string;
-    identifiant: string;
-    password: string;
-    duration: string;
-    subject: string;
-    sendAt: number;
-    batch?: string;
+export interface HermodInfo {
+    senders: string[];
+    fromName: string;
+    durations: Record<string, string>;
+    autoVars: Record<string, string>;
+    jobs: HermodJob[];
+    templates: HermodTemplate[];
 }
