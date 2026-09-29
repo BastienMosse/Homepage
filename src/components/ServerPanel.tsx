@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Container, ContainerGroup, ServerStats, HealthCheck } from '../types.ts';
 import ServerStatsPanel from './ServerStats.tsx';
 import ContainerModal from './ContainerModal.tsx';
+import AccessPanel from './AccessPanel.tsx';
 import { Play, Square, RotateCw, Activity, Globe, Terminal, Copy, Check, AlertTriangle } from 'lucide-react';
 
 // Pense-bête pour les pannes connues (voir CLAUDE.md) : à lancer en SSH sur le serveur
@@ -119,6 +120,8 @@ export default function ServerPanel() {
                     </div>
                 )}
             </div>
+
+            <AccessPanel />
 
             <div className="section" style={{ animationDelay: '.15s' }}>
                 <div className="section-header">

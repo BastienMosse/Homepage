@@ -5,6 +5,7 @@ const path = require('path');
 const { DEFAULT_VITRINE, normalizeVitrine, renderVitrine } = require('./vitrine.cjs');
 const { handleZip } = require('./ygg-zip.cjs');
 const hermod = require('./hermod.cjs');
+const access = require('./access.cjs');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
@@ -18,6 +19,8 @@ const LAYOUT_FILE = process.env.LAYOUT_FILE || path.join(DATA_DIR, 'layout.json'
 const VITRINE_FILE = process.env.VITRINE_FILE || path.join(path.dirname(LAYOUT_FILE), 'vitrine.json');
 // Envois programmés d'Hermod (contient les mots de passe en attente, chiffrés)
 const HERMOD_FILE = process.env.HERMOD_FILE || path.join(path.dirname(LAYOUT_FILE), 'hermod.json');
+// Accès Public / VPN : état voulu par application + journal
+const ACCESS_FILE = process.env.ACCESS_FILE || path.join(path.dirname(LAYOUT_FILE), 'access.json');
 
 // Yggdrasil (OpenList) : UUID Coolify du conteneur, dont le nom change à chaque redéploiement.
 // YGG_URL (ex. http://localhost:5244) court-circuite la recherche, pour les tests.
@@ -561,6 +564,21 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // --- Accès Public / VPN ---
+    if (url === '/api/admin/access' && req.method === 'GET') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        try { return json(res, 200, await access.overview()); }
+        catch (e) { return json(res, 502, { error: e.message }); }
+    }
+    const am = url.match(/^\/api\/admin\/access\/([a-z0-9]{20,32})$/);
+    if (am && req.method === 'POST') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        let target;
+        try { target = JSON.parse(await parseBody(req)).target; } catch { return json(res, 400, { error: 'JSON invalide' }); }
+        try { access.request(am[1], target); return json(res, 202, { ok: true }); }
+        catch (e) { return json(res, e.status || 500, { error: e.message }); }
+    }
+
     // --- Hermod (mails programmés) ---
     if (url.startsWith('/api/admin/hermod')) {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
@@ -750,6 +768,8 @@ const server = http.createServer(async (req, res) => {
     });
 });
 
+access.start(ACCESS_FILE, dockerRequest);
+
 try { hermod.start(HERMOD_FILE); }
 catch (e) { console.error('Hermod désactivé :', e.message); }
 
@@ -760,6 +780,7 @@ server.listen(PORT, () => {
     console.log(`Layout file: ${LAYOUT_FILE}`);
     console.log(`Vitrine file: ${VITRINE_FILE}`);
     console.log(`Hermod file: ${HERMOD_FILE}`);
+    console.log(`Access file: ${ACCESS_FILE}`);
 });
 
 process.on('SIGTERM', () => { clearInterval(cpuInterval); server.close(); });
