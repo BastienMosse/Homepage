@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Shield, Globe, Lock, RotateCw, Check, X, Loader, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Shield, Globe, Lock, RotateCw, Check, X, Loader, AlertTriangle, ChevronDown, Users } from 'lucide-react';
 
 interface Item {
     uuid: string; name: string; hosts: string[];
@@ -16,6 +16,14 @@ interface Overview {
     locked: { name: string; host: string; dns: boolean; outside: number }[];
     job: Job | null; queue: string[]; events: Event[];
     dnsError: string | null; tokenMissing: boolean;
+    vpn?: VpnOverview;
+}
+interface VpnUser { name: string; admin: boolean; locked: boolean; devices: { name: string; ips: string[]; online: boolean }[] }
+interface VpnSite { key: string; name: string; hosts: string[]; users: string[] }
+interface VpnOverview {
+    writable?: boolean; error?: string | null;
+    last?: { at: number; traefik: string | null; acl: string | null; error: string | null; aclMode: string | null };
+    users: VpnUser[]; sites: VpnSite[];
 }
 
 const when = (t: number) => new Date(t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -164,6 +172,8 @@ export default function AccessPanel() {
                 </div>
             )}
 
+            {data?.vpn && <VpnMatrix vpn={data.vpn} onChange={load} />}
+
             {data && data.events.length > 0 && (
                 <div className="ac-log">
                     <button className="ac-log-toggle" onClick={() => setShowLog(v => !v)}>
@@ -180,3 +190,80 @@ export default function AccessPanel() {
         </div>
     );
 }
+
+/** Qui accède à quoi dans le VPN : une case par utilisateur Headscale et par site réservé au VPN. */
+function VpnMatrix({ vpn, onChange }: { vpn: VpnOverview; onChange: () => void }) {
+    const [busy, setBusy] = useState<string | null>(null);
+    const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+    async function send(key: string, body: object) {
+        setBusy(key); setMsg(null);
+        try {
+            const r = await fetch('/api/admin/access/vpn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const d = await r.json();
+            if (!r.ok || d.error) setMsg({ ok: false, text: d.error || `erreur ${r.status}` });
+            else setMsg({ ok: true, text: `Appliqué — Traefik : ${d.traefik} · Headscale : ${d.acl}` });
+        } catch (e) { setMsg({ ok: false, text: (e as Error).message }); }
+        setBusy(null);
+        onChange();
+    }
+
+    const last = vpn.last;
+    return (
+        <div className="ac-vpn">
+            <div className="section-header" style={{ marginTop: 18 }}>
+                <Users size={14} /> Qui accède à quoi (VPN)
+            </div>
+            <p className="le-hint" style={{ marginBottom: 10 }}>
+                Utilisateurs et appareils lus dans Headscale (Heimdall). Un nouvel appareil hérite des droits de son utilisateur.
+                Les <b>administrateurs</b> accèdent à tout ; les autres ne peuvent joindre que les sites cochés.
+            </p>
+            {!vpn.writable && <div className="sp-alert"><AlertTriangle size={14} /><div>Asgard ne peut pas encore écrire les filtres Traefik (dossier des configurations non monté) : les cases sont en lecture seule.</div></div>}
+            {vpn.error && <div className="sp-alert"><AlertTriangle size={14} /><div>{vpn.error}</div></div>}
+            {last?.aclMode === 'file' && <div className="sp-alert"><AlertTriangle size={14} /><div>La politique d’accès de Headscale est en mode « fichier » : les filtres par site sont actifs, mais pas encore le blocage des autres appareils et du SSH pour les utilisateurs limités.</div></div>}
+            <div className="ac-matrix-wrap">
+                <table className="ac-matrix">
+                    <thead>
+                        <tr>
+                            <th>Utilisateur</th>
+                            <th title="Accès à tout le VPN (tous les sites, tous les appareils)">Admin</th>
+                            {vpn.sites.map(s => <th key={s.key} title={s.hosts.join(', ')}>{s.name}</th>)}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {vpn.users.map(u => (
+                            <tr key={u.name}>
+                                <td>
+                                    <div className="ac-user">{u.name}</div>
+                                    <div className="ac-devices">
+                                        {u.devices.length ? u.devices.map(d => <span key={d.name} className={d.online ? 'on' : ''} title={d.ips.join(', ')}>{d.name}</span>) : <span className="none">aucun appareil</span>}
+                                    </div>
+                                </td>
+                                <td>
+                                    <input type="checkbox" checked={u.admin} disabled={u.locked || !vpn.writable || !!busy}
+                                        title={u.locked ? 'Toujours administrateur (sinon tu te bloquerais dehors)' : ''}
+                                        onChange={e => send(`${u.name}:admin`, { user: u.name, admin: e.target.checked })} />
+                                </td>
+                                {vpn.sites.map(s => {
+                                    const k = `${u.name}:${s.key}`;
+                                    return (
+                                        <td key={s.key}>
+                                            {busy === k ? <Loader size={13} className="sp-spin" /> : (
+                                                <input type="checkbox" checked={u.admin || s.users.includes(u.name)} disabled={u.admin || !vpn.writable || !!busy}
+                                                    title={u.admin ? 'Administrateur : accès à tout' : ''}
+                                                    onChange={e => send(k, { user: u.name, site: s.key, allowed: e.target.checked })} />
+                                            )}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {msg && <div className={`ac-vpn-msg ${msg.ok ? '' : 'ac-fail'}`}>{msg.ok ? <Check size={12} /> : <X size={12} />} {msg.text}</div>}
+            {last && last.at > 0 && !msg && <div className="ac-vpn-msg">Dernière mise à jour {when(last.at)} — Traefik : {last.traefik ?? '—'} · Headscale : {last.acl ?? '—'}{last.error ? ` · erreur : ${last.error}` : ''}</div>}
+        </div>
+    );
+}
+

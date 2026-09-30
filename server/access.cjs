@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const vpnusers = require('./vpnusers.cjs');
 
 const API = (process.env.COOLIFY_API_URL || 'http://coolify:8080/api/v1').replace(/\/$/, '');
 const TOKEN = process.env.COOLIFY_API_TOKEN || '';
@@ -20,6 +21,9 @@ const WATCH_MS = 5 * 60e3;
 const RETRY_MS = 30 * 60e3;
 
 const VPN_MW = ['error-403@file', 'vpn-only@file'];
+// filtre VPN d'une app : son filtre « par utilisateur » (acces-<uuid>) si Asgard peut écrire dans Traefik, sinon l'ancien filtre commun
+const isVpnMw = (m) => m === 'vpn-only@file' || /^acces-.+@file$/.test(m);
+const vpnMwFor = (uuid) => (vpnusers.isWritable() ? vpnusers.appMiddleware(uuid) : 'vpn-only@file');
 
 // Routes par fichier (pas d'app Coolify) : toujours VPN, règle d'infra
 const LOCKED_STATIC = [
@@ -106,16 +110,18 @@ function middlewaresOf(lines, r) {
     return l ? l.slice(mwKey(r).length).split(',').map(s => s.trim()).filter(Boolean) : [];
 }
 
-/** VPN = tous les routeurs HTTPS ont vpn-only. */
+/** VPN = tous les routeurs HTTPS ont un filtre VPN (commun ou par utilisateur). */
 function labelsAreVpn(lines, routers) {
-    return routers.length > 0 && routers.every(r => middlewaresOf(lines, r).includes('vpn-only@file'));
+    return routers.length > 0 && routers.every(r => middlewaresOf(lines, r).some(isVpnMw));
 }
+/** Encore sur l'ancien filtre commun (à passer sur le filtre par utilisateur) ? */
+const usesCommonFilter = (lines, routers) => routers.some(r => middlewaresOf(lines, r).includes('vpn-only@file'));
 
-function withAccess(lines, routers, vpn) {
+function withAccess(lines, routers, vpn, vpnMw = 'vpn-only@file') {
     let out = [...lines];
     for (const r of routers) {
-        const mws = middlewaresOf(out, r).filter(m => !VPN_MW.includes(m));
-        const next = vpn ? [...VPN_MW, ...mws] : mws;
+        const mws = middlewaresOf(out, r).filter(m => m !== 'error-403@file' && !isVpnMw(m));
+        const next = vpn ? ['error-403@file', vpnMw, ...mws] : mws;
         const idx = out.findIndex(x => x.startsWith(mwKey(r)));
         if (!next.length) { if (idx >= 0) out.splice(idx, 1); continue; }
         const line = mwKey(r) + next.join(',');
@@ -166,7 +172,7 @@ async function runningVpn(uuid) {
         if (!c) return null;
         const keys = Object.entries(c.Labels || {}).filter(([k]) => /^traefik\.http\.routers\.https[^.]*\.middlewares$/.test(k));
         if (!keys.length) return false;
-        return keys.every(([, v]) => String(v).split(',').map(s => s.trim()).includes('vpn-only@file'));
+        return keys.every(([, v]) => String(v).split(',').map(s => s.trim()).some(isVpnMw));
     } catch { return null; }
 }
 
@@ -185,7 +191,7 @@ async function listApps() {
     return (Array.isArray(apps) ? apps : []).map(a => {
         const lines = decode(a.custom_labels).split('\n').map(l => l.trim()).filter(Boolean);
         const routers = httpsRouters(lines);
-        return { uuid: a.uuid, name: a.name, lines, routers, hosts: hostsOf(lines, routers), vpn: labelsAreVpn(lines, routers) };
+        return { uuid: a.uuid, name: a.name, lines, routers, hosts: hostsOf(lines, routers), vpn: labelsAreVpn(lines, routers), common: usesCommonFilter(lines, routers) };
     }).filter(a => a.routers.length && a.hosts.length);
 }
 
@@ -232,9 +238,17 @@ async function apply(uuid, target, meta = {}) {
             saveState();
             s.ok(app.hosts.join(', '));
         }
+        // 1 bis. VPN : le filtre « par utilisateur » de ce site doit exister avant que le site s'en serve
+        if (vpn && vpnusers.isWritable()) {
+            const s = step(j, 'Filtre « qui accède à quoi »');
+            vpnusers.ensureSite(uuid, app.name, app.hosts);
+            const r = await vpnusers.applyFiles(`${app.name} passé en VPN`);
+            if (r.error) { s.fail(r.error); throw new Error(r.error); }
+            s.ok();
+        }
         // 2. filtres Traefik
         const s2 = step(j, vpn ? 'Filtres : bloquer hors VPN' : 'Filtres : ouvrir à tous');
-        const next = withAccess(before, app.routers, vpn);
+        const next = withAccess(before, app.routers, vpn, vpnMwFor(uuid));
         await coolify('PATCH', `/applications/${uuid}`, { custom_labels: encode(next.join('\n')) });
         s2.ok();
         // 3. redéploiement (les labels ne changent qu'à la création du conteneur)
@@ -323,6 +337,10 @@ async function watch() {
             logEvent({ uuid: a.uuid, name: a.name, ok: true, auto: true, text: 'passé en VPN à la main dans Coolify : adopté, entrée DNS du VPN ajoutée' });
             continue;
         }
+        if (a.vpn && a.common && vpnusers.isWritable()) {
+            enqueue(a.uuid, 'vpn', { auto: true, reason: 'passage au filtre « qui accède à quoi » (droits par utilisateur)' });
+            continue;
+        }
         const run = await runningVpn(a.uuid);
         if (run !== null && run !== a.vpn) {
             enqueue(a.uuid, a.vpn ? 'vpn' : 'public', { auto: true, reason: 'le conteneur ne correspondait pas à sa configuration, redéployé automatiquement' });
@@ -336,6 +354,12 @@ async function watch() {
 }
 
 /* ───────── vue d'ensemble pour l'interface ───────── */
+
+async function watchVpnUsers() {
+    if (!vpnusers.isWritable()) return;
+    const r = await vpnusers.applyFiles('surveillance (nouveaux appareils ?)');
+    if (r.traefik === 'écrit' || r.acl === 'appliquée') logEvent({ uuid: '', name: 'VPN', ok: !r.error, auto: true, text: `droits par utilisateur mis à jour (Traefik : ${r.traefik}, Headscale : ${r.acl})` });
+}
 
 async function overview() {
     const apps = await listApps();
@@ -363,7 +387,8 @@ async function overview() {
     const svc = await Promise.all(services.map(async s => ({ ...s, outside: await probeOutside(s.hosts[0]) })));
     const locked = await Promise.all(LOCKED_STATIC.map(async s => ({ ...s, dns: dnsHas(recs, s.host), outside: await probeOutside(s.host) })));
 
-    return { items, services: svc, locked, job, queue: queue.map(q => q.uuid), events: state.events.slice(0, 30), dnsError, tokenMissing: !TOKEN, at: Date.now() };
+    const vpn = await vpnusers.overview().catch((e) => ({ error: e.message, users: [], sites: [] }));
+    return { items, services: svc, locked, vpn, job, queue: queue.map(q => q.uuid), events: state.events.slice(0, 30), dnsError, tokenMissing: !TOKEN, at: Date.now() };
 }
 
 function request(uuid, target) {
@@ -377,8 +402,16 @@ function start(stateFile, docker) {
     STATE_FILE = stateFile;
     dockerRequest = docker;
     loadState();
-    setTimeout(watch, 30e3);
-    setInterval(watch, WATCH_MS);
+    vpnusers.init(() => state, saveState, async () => (await listApps()).filter(a => a.vpn));
+    setTimeout(async () => { await watchVpnUsers().catch(() => {}); watch(); }, 30e3);
+    setInterval(async () => { await watchVpnUsers().catch(() => {}); watch(); }, WATCH_MS);
 }
 
-module.exports = { start, overview, request, _test: { httpsRouters, hostsOf, labelsAreVpn, withAccess } };
+async function vpnRequest(body) {
+    if (typeof body.user !== 'string' || !body.user) throw Object.assign(new Error('utilisateur manquant'), { status: 400 });
+    if (typeof body.admin === 'boolean') return vpnusers.setAdmin(body.user, body.admin);
+    if (typeof body.site !== 'string' || typeof body.allowed !== 'boolean') throw Object.assign(new Error('requête invalide'), { status: 400 });
+    return vpnusers.setAccess(body.site, body.user, body.allowed);
+}
+
+module.exports = { start, overview, request, vpnRequest, _test: { httpsRouters, hostsOf, labelsAreVpn, withAccess } };

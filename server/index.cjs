@@ -570,6 +570,13 @@ const server = http.createServer(async (req, res) => {
         try { return json(res, 200, await access.overview()); }
         catch (e) { return json(res, 502, { error: e.message }); }
     }
+    if (url === '/api/admin/access/vpn' && req.method === 'POST') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        let body;
+        try { body = JSON.parse(await parseBody(req)); } catch { return json(res, 400, { error: 'JSON invalide' }); }
+        try { return json(res, 200, await access.vpnRequest(body)); }
+        catch (e) { return json(res, e.status || 500, { error: e.message }); }
+    }
     const am = url.match(/^\/api\/admin\/access\/([a-z0-9]{20,32})$/);
     if (am && req.method === 'POST') {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });

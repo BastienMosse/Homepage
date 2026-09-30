@@ -1848,3 +1848,20 @@ body.ve-grabbing, body.ve-grabbing * { cursor: grabbing !important; user-select:
     .ac-name { flex-basis: calc(100% - 90px); }
     .ac-btn, .ac-locked { margin-left: 74px; }
 }
+
+/* --- Qui accède à quoi (VPN) --- */
+.ac-matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.ac-matrix { width: 100%; border-collapse: collapse; font-size: .76rem; }
+.ac-matrix th, .ac-matrix td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: center; white-space: nowrap; }
+.ac-matrix th { font-weight: 600; color: var(--text-dim); font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; background: var(--surface); }
+.ac-matrix th:first-child, .ac-matrix td:first-child { text-align: left; }
+.ac-matrix tr:last-child td { border-bottom: 0; }
+.ac-matrix input[type=checkbox] { width: 16px; height: 16px; accent-color: #a99bf7; cursor: pointer; }
+.ac-matrix input:disabled { cursor: default; opacity: .7; }
+.ac-user { font-weight: 600; }
+.ac-devices { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.ac-devices span { font-size: .62rem; font-family: 'JetBrains Mono', monospace; color: var(--text-dim); padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); }
+.ac-devices span.on { color: #34d399; border-color: rgba(52,211,153,.35); }
+.ac-devices span.none { font-style: italic; border: 0; padding: 0; }
+.ac-vpn-msg { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: .7rem; color: var(--text-dim); }
+.ac-vpn-msg.ac-fail { color: #e2685f; }
