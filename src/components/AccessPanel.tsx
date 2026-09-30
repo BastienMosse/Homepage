@@ -210,7 +210,7 @@ function VpnMatrix({ vpn, onChange }: { vpn: VpnOverview; onChange: () => void }
 
     const last = vpn.last;
     return (
-        <div className="ac-vpn">
+        <div className="ac-vpnusers">
             <div className="section-header" style={{ marginTop: 18 }}>
                 <Users size={14} /> Qui accède à quoi (VPN)
             </div>
