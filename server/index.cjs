@@ -6,6 +6,7 @@ const { DEFAULT_VITRINE, normalizeVitrine, renderVitrine } = require('./vitrine.
 const { handleZip } = require('./ygg-zip.cjs');
 const hermod = require('./hermod.cjs');
 const access = require('./access.cjs');
+const resources = require('./resources.cjs');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || null;
@@ -666,6 +667,11 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    if (url === '/api/admin/resources') {
+        if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
+        return json(res, 200, resources.overview());
+    }
+
     const containerLogs = url.match(/^\/api\/admin\/containers\/([a-f0-9]+)\/logs$/);
     if (containerLogs) {
         if (!isAuthed(req)) return json(res, 401, { error: 'unauthorized' });
@@ -776,6 +782,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 access.start(ACCESS_FILE, dockerRequest);
+resources.start(dockerRequest, key => loadLayout().services?.[key]?.name || null);
 
 try { hermod.start(HERMOD_FILE); }
 catch (e) { console.error('Hermod désactivé :', e.message); }

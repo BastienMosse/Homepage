@@ -3,6 +3,7 @@ import type { Container, ContainerGroup, ServerStats, HealthCheck } from '../typ
 import ServerStatsPanel from './ServerStats.tsx';
 import ContainerModal from './ContainerModal.tsx';
 import AccessPanel from './AccessPanel.tsx';
+import ResourcesPanel from './ResourcesPanel.tsx';
 import { Play, Square, RotateCw, Activity, Globe, Terminal, Copy, Check, AlertTriangle } from 'lucide-react';
 
 // Pense-bête pour les pannes connues (voir CLAUDE.md) : à lancer en SSH sur le serveur
@@ -90,6 +91,8 @@ export default function ServerPanel() {
                 </div>
                 <ServerStatsPanel stats={stats} />
             </div>
+
+            <ResourcesPanel onSelect={setSelected} onAction={containerAction} />
 
             <div className="section" style={{ animationDelay: '.1s' }}>
                 <div className="section-header">

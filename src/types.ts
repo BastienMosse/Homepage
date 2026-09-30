@@ -17,6 +17,40 @@ export interface ContainerDetail {
     startedAt: string;
 }
 
+// --- Consommation par service (server/resources.cjs) ---
+
+export interface ResourceUsage {
+    cpu: number; cpu1h: number; cpuMax24h: number;   // % de la machine entière
+    mem: number; memMax24h: number;                 // octets
+    rx: number; tx: number; rd: number; wr: number; // octets/s
+    sparkCpu: (number | null)[];
+    sparkMem: (number | null)[];
+}
+
+export interface ResourceItem extends Container, ResourceUsage {
+    docker: string;
+    image: string;
+    pids: number;
+    mem1h: number;
+    protected: string;
+}
+
+export interface ResourceGroup extends ResourceUsage {
+    key: string;
+    label: string;
+    kind: 'app' | 'service' | 'system' | 'other';
+    running: number;
+    containers: ResourceItem[];
+}
+
+export interface ResourcesOverview {
+    at: number;
+    interval: number;
+    historySince: number;
+    host: { cpus: number; cpu: number; memTotal: number; memUsed: number; otherCpu: number; otherMem: number };
+    groups: ResourceGroup[];
+}
+
 export interface ServerStats {
     cpu: number;
     memory: { total: number; used: number; percent: number };
