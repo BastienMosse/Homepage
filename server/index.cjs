@@ -443,6 +443,11 @@ const cpuInterval = setInterval(sampleCpu, 2000);
 const server = http.createServer(async (req, res) => {
     const url = req.url.split('?')[0];
 
+    // La vitrine (lucipher-lab.fr) est publique alors qu'asgard. est réservé au VPN : l'API d'admin et la
+    // connexion ne répondent pas sur ses domaines (sinon on contournerait le VPN par lucipher-lab.fr/api/…)
+    const reqHost = (req.headers.host || '').split(':')[0].toLowerCase();
+    if (url.startsWith('/api/') && VITRINE_HOSTS.includes(reqHost)) return json(res, 404, { error: 'not_found' });
+
     if (url === '/api/auth/check') {
         json(res, 200, { authed: isAuthed(req) });
         return;

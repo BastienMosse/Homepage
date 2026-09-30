@@ -27,6 +27,8 @@ const vpnMwFor = (uuid) => (vpnusers.isWritable() ? vpnusers.appMiddleware(uuid)
 
 // Routes par fichier (pas d'app Coolify) : toujours VPN, règle d'infra
 const LOCKED_STATIC = [
+    // Asgard : route fichier asgard.yaml (le domaine asgard. seulement, la vitrine lucipher-lab.fr reste publique)
+    { name: 'Asgard', host: 'asgard.lucipher-lab.fr' },
     { name: 'Odin', host: 'odin.lucipher-lab.fr' },
     { name: 'Heimdall', host: 'heimdall.lucipher-lab.fr' },
     { name: 'Bifrost', host: 'bifrost.lucipher-lab.fr' },
@@ -362,7 +364,7 @@ async function watchVpnUsers() {
 }
 
 async function overview() {
-    const apps = await listApps();
+    const apps = (await listApps()).filter(a => a.uuid !== SELF); // Asgard : ligne « toujours VPN » plus bas
     let recs = [], dnsError = null;
     try { recs = readDns(); } catch (e) { dnsError = e.message; }
     const running = await Promise.all(apps.map(a => runningVpn(a.uuid)));

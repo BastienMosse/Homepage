@@ -22,6 +22,7 @@ const VPN_IP = process.env.VPN_SERVER_IP || '100.64.0.1';
 
 /** Sites VPN routés par fichier (pas d'app Coolify). Les apps VPN s'ajoutent automatiquement. */
 const STATIC_SITES = [
+    { key: 'asgard', name: 'Asgard', hosts: ['asgard.lucipher-lab.fr'] },
     { key: 'odin', name: 'Odin', hosts: ['odin.lucipher-lab.fr'] },
     { key: 'heimdall', name: 'Heimdall', hosts: ['heimdall.lucipher-lab.fr'] },
     { key: 'bifrost', name: 'Bifrost', hosts: ['bifrost.lucipher-lab.fr'] },
