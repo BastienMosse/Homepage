@@ -1135,7 +1135,7 @@ body::before {
     overflow-x: auto;
 }
 .admin-nav-inner img { margin-right: 8px; flex-shrink: 0; }
-.admin-nav button {
+.admin-nav button, .admin-nav a {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -1148,15 +1148,16 @@ body::before {
     font-size: .76rem;
     cursor: pointer;
     white-space: nowrap;
+    text-decoration: none;
     transition: all .2s ease;
 }
-.admin-nav button:hover { color: var(--text); background: var(--surface); }
+.admin-nav button:hover, .admin-nav a:hover { color: var(--text); background: var(--surface); }
 .admin-nav button.active {
     color: #a99bf7;
     background: var(--accent-dim);
     border-color: rgba(124,108,240,0.25);
 }
-.admin-nav .admin-nav-logout { margin-left: auto; }
+.admin-nav .admin-nav-site { margin-left: auto; }
 
 /* --- Serveur (urgence) --- */
 .sp-alert {
@@ -1440,7 +1441,7 @@ body::before {
     }
     .admin-nav-inner { gap: 0; padding: 4px 6px; overflow: visible; }
     .admin-nav-inner img { display: none; }
-    .admin-nav button {
+    .admin-nav button, .admin-nav a {
         flex: 1;
         min-width: 0;
         flex-direction: column;
@@ -1448,7 +1449,8 @@ body::before {
         padding: 7px 2px;
         font-size: .6rem;
     }
-    .admin-nav .admin-nav-logout { flex: 0 0 44px; margin-left: 0; }
+    .admin-nav .admin-nav-logout, .admin-nav .admin-nav-site { flex: 0 0 44px; margin-left: 0; }
+    .admin-nav .admin-nav-site span { display: none; }
 
     .page { padding: 28px 14px 24px; }
     .section { margin-bottom: 28px; }

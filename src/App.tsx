@@ -4,7 +4,7 @@ import BotMonitor from './components/BotMonitor.tsx';
 import VitrineEditor from './components/VitrineEditor.tsx';
 import ServerPanel from './components/ServerPanel.tsx';
 import HermodPanel from './components/HermodPanel.tsx';
-import { Activity, LogOut, Bot, PanelsTopLeft, Mail } from 'lucide-react';
+import { Activity, LogOut, Bot, PanelsTopLeft, Mail, Globe } from 'lucide-react';
 
 type Page = 'server' | 'vitrine' | 'hermod' | 'bots';
 
@@ -61,6 +61,10 @@ export default function App() {
                             <span>{n.label}</span>
                         </button>
                     ))}
+                    <a className="admin-nav-site" href="https://lucipher-lab.fr" title="Retour à la vitrine (lucipher-lab.fr)">
+                        <Globe size={13} />
+                        <span>Voir le site</span>
+                    </a>
                     <button className="admin-nav-logout" onClick={logout} title="Déconnexion">
                         <LogOut size={13} />
                     </button>
